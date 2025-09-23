@@ -94,6 +94,8 @@ func main() {
 		WaitTime:         *waitTime,
 		SyncTime:         *syncTime,
 		TestMode:         false,
+		RROptimisation:   true,
+		BPOptimisation:   false,
 	}
 	fmt.Fprintf(os.Stderr, "Updates Number : %d\n", cfg.UpdatesNB)
 	_ = measurement
@@ -120,10 +122,10 @@ func main() {
 		Config.ToFile(cfg, cfg.PeerName+"/time/config.cfg")
 		// Tests.Peer1Concu(cfg) // ------------- MANAGE CONCURENCY !!! Operation based representation of 2P-Set
 		// Tests.BootstrapDeltaBasedSetUp(cfg) // ------------- MANAGE CONCURENCY !!! Delta based CLSet
-		// Tests.BootstrapStateBasedSetUp(cfg) // ------------- State-based CLSet !!!
+		Tests.BootstrapStateBasedSetUp(cfg) // ------------- State-based CLSet !!!
 		// Tests.Peer1IPFS(cfg) // ------------- NO CONCURENCY, ONLY IPFS ALONE !!!
 		// Tests.Peer1(*peerName, *updatesNB, *ntpServ) // ------------- NO CONCURENCY, CRDT + IPFS  !!!
-		Tests.PeerSendIPFSBootstrapSharingFilesOnly(cfg) // ------------ Exchange files, and only files, to test
+		// Tests.PeerSendIPFSBootstrapSharingFilesOnly(cfg) // ------------ Exchange files, and only files, to test
 
 		// Tests.LogootBootstrap_OpBased(cfg) // Logoot, manage Concurrency
 	} else if *mode == "update" {
@@ -151,17 +153,17 @@ func main() {
 
 		if cfg.Updating {
 			// fmt.Println("UPDATING IN FACT")
-			Tests.Peer2ConcuUpdate(cfg) // ------------- 2P-Set MANAGE CONCURENCY - OP based!!!
+			// Tests.Peer2ConcuUpdate(cfg) // ------------- 2P-Set MANAGE CONCURENCY - OP based!!!
 			// Tests.Peer_DeltaUpdating(cfg) // ------------- MANAGE CONCURENCY !!!
 			// Tests.LogootUpdate_OpBased(cfg) // Logoot, manage Concurrency
-			// Tests.Peer_Updating(cfg) // ------------- State-based CLSet !!!
+			Tests.Peer_Updating(cfg) // ------------- State-based CLSet !!!
 		} else {
 			// fmt.Println("NOT UPDATING FIOU")
 			// Tests.Peer2Concu(cfg) // ------------------- 2P-Set MANAGE CONCURENCY OP based!!!
-			Tests.PeerSendIPFSBootstrapReceivingFilesOnly(cfg) // ------------ Exchange files, and only files, to test
+			// Tests.PeerSendIPFSBootstrapReceivingFilesOnly(cfg) // ------------ Exchange files, and only files, to test
 			// Tests.Peer_DeltaNotUpdating(cfg) // ------------- MANAGE CONCURENCY !!!
 			// Tests.LogootNoUpdate_OpBased(cfg) // Logoot, manage Concurrency
-			// Tests.Peer_NotUpdating(cfg) // ------------- State-based CLSet !!!
+			Tests.Peer_NotUpdating(cfg) // ------------- State-based CLSet !!!
 		}
 
 		// Tests.Peer2IPFS(cfg) // ------------- NO CONCURENCY, ONLY IPFS ALONE !!!

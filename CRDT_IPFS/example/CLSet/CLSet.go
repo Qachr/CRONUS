@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -42,19 +41,22 @@ type State struct {
 	SetData map[Element]int
 }
 
-func (thisState State) mergeState(other State) {
+func (thisState State) mergeState(other State) bool {
+	modif := false
 	for x := range other.SetData {
 		val, ok := thisState.SetData[x]
 		valother := thisState.SetData[x]
 		if ok {
 			if val < valother {
 				thisState.SetData[x] = valother
+				modif = true
 			}
 		} else {
 			thisState.SetData[x] = valother
+			modif = true
 		}
-
 	}
+	return modif
 }
 
 func (thisElement Element) ToString() string {
@@ -211,10 +213,13 @@ func CreateDagNode(s State, id string) CRDTCLSetStateBasedDagNode {
 // =======================================================================================
 
 type CRDTCLSetStateBasedDag struct {
-	dag           *CRDTDag.CRDTManager
-	measurement   bool
-	setValue      CRDTCLSetStateBased
-	lastSentValue CRDTCLSetStateBased
+	dag                    *CRDTDag.CRDTManager
+	measurement            bool
+	modified               bool
+	backPropagationRemoval bool
+	RemoveRedundancy       bool
+	setValue               CRDTCLSetStateBased
+	lastSentValue          CRDTCLSetStateBased
 }
 
 func (thisCRDTDag *CRDTCLSetStateBasedDag) GetDag() *CRDTDag.CRDTManager {
@@ -260,7 +265,11 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) Merge(cids []CRDTDag.EncodedStr) []st
 		n := CreateDagNode(State{}, "")           // Create an Empty operation
 		n.FromFile(fil)                           // Fill it with the operation just read
 		thisCRDTDag.remoteAddNode(cids[index], n) // Add the data as a Remote operation (which are applied as a local one)
-		thisCRDTDag.setValue.SetState.mergeState((*n.DagNode.Event).(*PayloadStateBased).SetState)
+		arrivedSt := (*n.DagNode.Event).(*PayloadStateBased).SetState
+		modif := thisCRDTDag.setValue.SetState.mergeState(arrivedSt)
+		if !thisCRDTDag.backPropagationRemoval && thisCRDTDag.RemoveRedundancy {
+			thisCRDTDag.modified = thisCRDTDag.modified || modif
+		}
 	}
 	return fils
 }
@@ -332,7 +341,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) callAddToIPFS(bytes []byte, file stri
 }
 
 func (thisCRDTDag *CRDTCLSetStateBasedDag) SendState() (string, TimeTuple) {
-	if !reflect.DeepEqual(thisCRDTDag.lastSentValue.SetState.SetData, thisCRDTDag.setValue.SetState.SetData) {
+	if thisCRDTDag.modified || !thisCRDTDag.RemoveRedundancy {
 		newNode := CreateDagNode(thisCRDTDag.setValue.SetState, thisCRDTDag.GetSys().IpfsNode.Identity.Pretty())
 		newNode.DagNode.DirectDependency = append(newNode.DagNode.DirectDependency, thisCRDTDag.dag.Root_nodes...)
 
@@ -402,7 +411,10 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) SendState() (string, TimeTuple) {
 				}
 			}
 		}
-		thisCRDTDag.lastSentValue.SetState.mergeState(thisCRDTDag.setValue.SetState)
+		thisCRDTDag.setValue.SetState.mergeState(thisCRDTDag.setValue.SetState)
+		thisCRDTDag.lastSentValue = thisCRDTDag.setValue
+
+		thisCRDTDag.modified = false
 		return c.String(), times
 	} else {
 		return "", TimeTuple{}
@@ -410,15 +422,17 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) SendState() (string, TimeTuple) {
 }
 func (thisCRDTDag *CRDTCLSetStateBasedDag) Add(x string) {
 	thisCRDTDag.setValue.Add(x)
+	thisCRDTDag.modified = true
 }
 
 func (thisCRDTDag *CRDTCLSetStateBasedDag) Remove(x string) {
 	thisCRDTDag.setValue.Remove(x)
+	thisCRDTDag.modified = true
 }
 
 func Create_CRDTCLSetStateBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConfig) *CRDTCLSetStateBasedDag {
 	man := CRDTDag.Create_CRDTManager(sys, cfg.PeerName, cfg.BootstrapPeer, cfg.Encode, cfg.Measurement)
-	crdtSet := CRDTCLSetStateBasedDag{dag: &man, measurement: cfg.Measurement, setValue: Create_CRDTCLSetStateBased(sys)}
+	crdtSet := CRDTCLSetStateBasedDag{dag: &man, measurement: cfg.Measurement, setValue: Create_CRDTCLSetStateBased(sys), RemoveRedundancy: cfg.RROptimisation, backPropagationRemoval: cfg.BPOptimisation, modified: false}
 	if cfg.BootstrapPeer == "" {
 		x, err := os.ReadFile("initial_value")
 		if err != nil {

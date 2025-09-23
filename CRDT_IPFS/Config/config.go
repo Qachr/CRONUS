@@ -22,6 +22,8 @@ type CRONUSConfig struct {
 	SwarmKey         bool
 	ParallelRetrieve bool
 	TestMode         bool
+	RROptimisation   bool
+	BPOptimisation   bool
 }
 
 func ToFile(cfg CRONUSConfig, file string) {
