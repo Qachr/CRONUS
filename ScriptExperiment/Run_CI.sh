@@ -48,6 +48,10 @@ ssh root@$MASTER "sh -c 'sysctl -w net.ipv6.conf.all.disable_ipv6=1 && sysctl -w
 # ssh root@$MASTER "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --mode=BootStrap --ParallelRetrieve=0 --name=node1 --updatesNB=$numberUpdates --updating=true --WaitTime=$waitTime --SyncTime=$SyncTime  > /dev/null & '"  &
 ssh root@$MASTER "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --ParallelRetrieve=1  --mode=BootStrap --name=node1 --updatesNB=$numberUpdates --updating=true --WaitTime=$waitTime   --SyncTime=$SyncTime  > /dev/null & '"  &
 
+
+
+#./IPFS_CRDT --ParallelRetrieve=1  --mode=BootStrap --name=node1 --updatesNB=100 --updating=true --WaitTime=500   --SyncTime=1
+
 sleep 30s
 BOOTSTRAPIDS=$(ssh root@$MASTER "sh -c 'cat ./CRDT_IPFS/ID2'")
 BOOTSTRAPID=""
@@ -103,7 +107,7 @@ if [[ $x > 0 ]]
 then
 echo "updating"
 
-# ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --encode sataislifesataisloveanditsfor32b --mode update --ni ${BOOTSTRAPID} --name node1 --updatesNB $numberUpdates --updating true  > /dev/null &'" &
+# ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --encode sataislifesataisloveanditsfor32b --mode update --ni ${BOOTSTRAPID} --name node1 --updatesNB 100 --updating true  > /dev/null &'" &
 # 
 # ./IPFS_CRDT --mode update --ni /ip4/172.16.193.5/udp/42911/quic-v1/webtransport/certhash/uEiBRLcQZ0wJ5qbdbXiOWnZ7e-NNCm6bAxHnQwIYspQrVag/certhash/uEiCtpQctH5sNZjsSLmU1u7_gE4DlYCJDf4dwccm01RhVsQ/p2p/12D3KooWC5y4WAcM2yxb1LtV2F3b253zEuqtuuV7tUUPnKi1dLyN --name node1 --updatesNB 100 --IPFSBootstrap ~/CRDT_IPFS/IDBootstrapIPFS --updating true 
 ssh root@$SLAVE "sh -c 'cd CRDT_IPFS  && ./IPFS_CRDT  --mode=update --ParallelRetrieve=1 --ni=${BOOTSTRAPID} --name=node1 --updatesNB=$numberUpdates  --IPFSBootstrap=IDBootstrapIPFS --updating=true --WaitTime=$waitTime  --SyncTime=$SyncTime  > /dev/null &'" &

@@ -186,7 +186,6 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	}
 	time.Sleep(10 * time.Second)
 
-	fmt.Printf("1\n")
 	getSema(sema, sys1.Ctx)
 	SetCrdt1 := CLSet.Create_CRDTCLSetStateBasedDag(sys1, cfg)
 	returnSema(sema)
@@ -195,7 +194,6 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	fileRead.WriteString("Taking Sema to write headers ... ")
 	getSema(sema, sys1.Ctx)
 	file.WriteString("CID,time,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
-	fmt.Printf("2\n")
 
 	returnSema(sema)
 	fileRead.WriteString("Header just written\n")
@@ -227,7 +225,6 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 			fileRead.WriteString("all update received are handled\n= = = = = = =\n")
 		}
 	}
-	fmt.Printf("3\n")
 
 	// Send updates concurrently every 1 seconds
 	go doUpdates(cfg.UpdatesNB, SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema)
@@ -238,8 +235,6 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	ti = time.Now()
 	k := 0
 	for k < cfg.UpdatesNB {
-		fmt.Printf("4\n")
-
 		time.Sleep(time.Duration(cfg.WaitTime) * time.Microsecond)
 
 		strList := SetCrdt1.CheckUpdate(sema)

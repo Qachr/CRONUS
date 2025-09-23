@@ -2,6 +2,9 @@ module IPFS_CRDT
 
 go 1.20
 
+replace github.com/libp2p/go-libp2p-kad-dht => ./kad/go-libp2p-kad-dht
+
+
 require (
 	github.com/ipfs/boxo v0.11.0
 	github.com/ipfs/go-cid v0.4.1
