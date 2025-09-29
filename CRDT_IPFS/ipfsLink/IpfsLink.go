@@ -1,6 +1,34 @@
 package IpfsLink
 
 import (
+	// "context"
+	// "encoding/json"
+	// "errors"
+	// 	"fmt"
+	// 	"io"
+	// 	"io/fs"
+	// 	"io/ioutil"
+	// 	"os"
+	// 	"path/filepath"
+	// 	"strconv"
+	// 	"sync"
+	// 	"time"
+
+	// 	"github.com/ipfs/go-cid"
+	// 	files "github.com/ipfs/go-libipfs/files"
+
+	// 	iface "github.com/ipfs/boxo/coreiface"
+	// 	ifacepath "github.com/ipfs/boxo/coreiface/path"
+
+	// 	"github.com/ipfs/kubo/config"
+	// 	"github.com/ipfs/kubo/core"
+	// 	"github.com/ipfs/kubo/core/bootstrap"
+	// 	"github.com/ipfs/kubo/core/coreapi"
+	// 	libp2pIFPS "github.com/ipfs/kubo/core/node/libp2p"
+	// 	"github.com/ipfs/kubo/plugin/loader"
+	// 	"github.com/ipfs/kubo/repo/fsrepo"
+
+	// 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,22 +42,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ipfs/boxo/bootstrap"
 	"github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-libipfs/files"
-
-	iface "github.com/ipfs/boxo/coreiface"
-	ifacepath "github.com/ipfs/boxo/coreiface/path"
+	files "github.com/ipfs/go-ipfs-files"
+	iface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/kubo/config"
 	"github.com/ipfs/kubo/core"
-	"github.com/ipfs/kubo/core/bootstrap"
 	"github.com/ipfs/kubo/core/coreapi"
-	libp2pIFPS "github.com/ipfs/kubo/core/node/libp2p"
 	"github.com/ipfs/kubo/plugin/loader"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	// "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 )
 
 // DiscoveryInterval is how often we re-publish our mDNS records.
