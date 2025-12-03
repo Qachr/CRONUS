@@ -9,52 +9,63 @@ import (
 	// 	"io/fs"
 	// 	"io/ioutil"
 	// 	"os"
-	// 	"path/filepath"
+
+	"io"
+	"io/ioutil"
+	"log"
+	"net"
+	"path/filepath"
+	"strconv"
+
 	// 	"strconv"
 	// 	"sync"
 	// 	"time"
 
-	// 	"github.com/ipfs/go-cid"
-	// 	files "github.com/ipfs/go-libipfs/files"
-
 	// 	iface "github.com/ipfs/boxo/coreiface"
-	// 	ifacepath "github.com/ipfs/boxo/coreiface/path"
 
 	// 	"github.com/ipfs/kubo/config"
 	// 	"github.com/ipfs/kubo/core"
 	// 	"github.com/ipfs/kubo/core/bootstrap"
 	// 	"github.com/ipfs/kubo/core/coreapi"
-	// 	libp2pIFPS "github.com/ipfs/kubo/core/node/libp2p"
+
 	// 	"github.com/ipfs/kubo/plugin/loader"
 	// 	"github.com/ipfs/kubo/repo/fsrepo"
 
 	// 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"io/fs"
-	"io/ioutil"
 	"os"
-	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/ipfs/boxo/bootstrap"
-	"github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-ipfs-files"
-	iface "github.com/ipfs/interface-go-ipfs-core"
+	// "github.com/ipfs/go-cid"
+	// pubsub "github.com/libp2p/go-libp2p-pubsub"
+	// "github.com/libp2p/go-libp2p/core/host"
+	// "github.com/libp2p/go-libp2p/core/peer"
+	// "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+
+	// 	"github.com/ipfs/go-cid"
+
+	blocks "github.com/ipfs/go-block-format"
+	cid "github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/ipfs/kubo/config"
 	"github.com/ipfs/kubo/core"
-	"github.com/ipfs/kubo/core/coreapi"
+	coreapi "github.com/ipfs/kubo/core/coreapi" // experimental API interface
+	iface "github.com/ipfs/kubo/core/coreiface"
+
 	"github.com/ipfs/kubo/plugin/loader"
+	_ "github.com/ipfs/kubo/plugin/loader" // ensure built-in plugins are loaded
 	"github.com/ipfs/kubo/repo/fsrepo"
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+
+	libp2pIFPS "github.com/ipfs/kubo/core/node/libp2p"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 )
 
@@ -77,7 +88,7 @@ func defaultNick(p peer.ID) string {
 
 // shortID returns the last 8 chars of a base58-encoded peer id.
 func shortID(p peer.ID) string {
-	pretty := p.Pretty()
+	pretty := p.ShortString()
 	return pretty[len(pretty)-8:]
 }
 
@@ -93,7 +104,7 @@ func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	fmt.Printf("discovered new peer %s\n", pi.Addrs[0])
 	err := n.h.Connect(context.Background(), pi)
 	if err != nil {
-		fmt.Printf("error connecting to peer %s: %s\n", pi.ID.Pretty(), err)
+		fmt.Printf("error connecting to peer %s: %s\n", pi.ID.ShortString(), err)
 	}
 }
 
@@ -126,27 +137,22 @@ func InitNode(peerName string, bootstrapPeer string, ipfsBootstrap []byte, swarm
 	ct, cancl := context.WithCancel(context.Background())
 
 	// Spawn a local peer using a temporary path, for testing purposes
-	var idBootstrap peer.AddrInfo
+	// var idBootstrap peer.AddrInfo
 	var ipfsA iface.CoreAPI
 	var nodeA *core.IpfsNode
 	var err error
-	bootstrapConfig := MultiAddressesJson{
-		AddressList: make([]string, 0),
-	}
-	if len(ipfsBootstrap) > 0 {
-		err = json.Unmarshal(ipfsBootstrap, &bootstrapConfig)
-		if err != nil {
-			printErr("error Unmarshalling bootstrap file, %v", err)
-			panic(err)
-		}
 
-		e := idBootstrap.UnmarshalJSON(ipfsBootstrap)
-		if e != nil {
-			panic(fmt.Errorf("couldn't Unmarshal bootstrap peer addr info, error : %s", e))
-		}
-	}
+	fmt.Printf("Bootstrap peer : %s\n Bootstrap Byte : %s\n", bootstrapPeer, ipfsBootstrap)
+	if bootstrapPeer != "" {
+		bootstrapConfig := ReadPeerInfo(ipfsBootstrap)
 
-	ipfsA, nodeA, err = spawnEphemeral(ct, bootstrapConfig.AddressList, swarmKey)
+		fmt.Println("calling spawn ephermeral\n !!!!!!\n!!!!!!\n!!!!!!\n!!!!!!")
+		ipfsA, nodeA, err = spawnEphemeral(ct, bootstrapConfig.AddressList, swarmKey)
+	} else {
+		fmt.Println("calling spawn ephermeral\n !!!!!!\n!!!!!!\n!!!!!!\n!!!!!!")
+		ipfsA, nodeA, err = spawnEphemeral(ct, nil, swarmKey)
+
+	}
 
 	if err != nil {
 		panic(fmt.Errorf("failed to spawn peer node: %s", err))
@@ -161,6 +167,9 @@ func InitNode(peerName string, bootstrapPeer string, ipfsBootstrap []byte, swarm
 		GossipSub:       h.Ps,
 		Cr:              h,
 		ParalelRetrieve: parallelRetrieve,
+	}
+	if bootstrapPeer != "" {
+		connectToPeer(h.Host, string(ipfsBootstrap))
 	}
 
 	//fmt.Println(ipfs.IpfsNode.Peerstore.PeerInfo(ipfs.IpfsNode.PeerHost.ID()))
@@ -194,6 +203,18 @@ func WritePeerInfo(sys IpfsLink, file string) {
 
 }
 
+func ReadPeerInfo(data []byte) MultiAddressesJson {
+	var addresses MultiAddressesJson
+
+	err := json.Unmarshal(data, &addresses)
+	if err != nil {
+		panic(fmt.Errorf("could not unmarshal multiaddress file : %v", err.Error()))
+	}
+
+	return addresses
+
+}
+
 var loadPluginsOnce sync.Once
 
 func setupPlugins(externalPluginsPath string) error {
@@ -215,6 +236,19 @@ func setupPlugins(externalPluginsPath string) error {
 	return nil
 }
 
+// Get preferred outbound ip of this machine
+func GetOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
+}
+
 var LoopBackAddresses = []string{
 	"/ip4/127.0.0.1/ipcidr/8",
 	"/ip6/::1/ipcidr/128",
@@ -224,29 +258,38 @@ const PORT = 0
 
 func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 	repoPath, err := os.MkdirTemp("", "ipfs-shell")
-	if err != nil {
-		return "", fmt.Errorf("failed to get temp dir: %s", err)
-	}
 
-	// Create a config with default options and a 2048 bit key
+	// Create a default config with a new identity
 	cfg, err := config.Init(io.Discard, 2048)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to init config: %w", err)
 	}
 
-	cfg.Bootstrap = BootstrapMultiAddrList
-
-	bootstrap.DefaultBootstrapConfig = bootstrap.BootstrapConfig{
-		MinPeerThreshold:        0,
-		Period:                  10 * time.Second,
-		ConnectionTimeout:       (10 * time.Second) / 3, // Period / 3
-		BackupBootstrapInterval: 1 * time.Hour,
+	// Set both ipv4 and ipv6 addresses.
+	cfg.Addresses.Swarm = []string{
+		fmt.Sprintf("/ip4/%s/tcp/%d", GetOutboundIP(), PORT),
+		fmt.Sprintf("/ip4/%s/udp/%d/quic-v1", GetOutboundIP(), PORT),
+		fmt.Sprintf("/ip4/%s/udp/%d/quic-v1/webtransport", GetOutboundIP(), PORT),
+		// fmt.Sprintf("/ip6/::/tcp/%d", peerConfig.Port),
+		// fmt.Sprintf("/ip6/::/udp/%d/quic-v1", peerConfig.Port),
+		// fmt.Sprintf("/ip6/::/udp/%d/quic-v1/webtransport", peerConfig.Port),
 	}
+
+	//1 to ...
+	// Validate peer addresses
+	for _, addr := range BootstrapMultiAddrList {
+		if _, err := peer.AddrInfoFromString(addr); err != nil {
+			return "", fmt.Errorf("invalid bootstrap addr %s: %w", addr, err)
+		}
+	}
+
+	cfg.Bootstrap = []string{}
 
 	cfg.Discovery.MDNS.Enabled = false
 	cfg.AutoNAT = config.AutoNATConfig{
 		ServiceMode: config.AutoNATServiceEnabled,
 	}
+	// ... to 2
 
 	cfg.Swarm = config.SwarmConfig{
 		AddrFilters: LoopBackAddresses,
@@ -259,6 +302,12 @@ func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", PORT)},
 		NoAnnounce: LoopBackAddresses,
 	}
+	cfg.AutoTLS.Enabled = config.False
+	cfg.Swarm.Transports.Network.Websocket = config.False // No webocket in Private network
+
+	cfg.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
+	cfg.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
+
 	cfg.Datastore = config.DefaultDatastoreConfig()
 	dataStoreFilePath := filepath.Join(repoPath, "datastore_spec")
 	datastoreContent := map[string]interface{}{
@@ -291,23 +340,20 @@ func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 		panic(err)
 	}
 
-	plugins, err := loader.NewPluginLoader(repoPath)
+	// initRepo initializes a repo at the given path if it does not already exist.
+	plugins, err := loader.NewPluginLoader("")
 	if err != nil {
-		panic(fmt.Errorf("error loading plugins: %s", err))
+		return "", fmt.Errorf("failed to create plgin loader: %w", err)
 	}
-
 	if err := plugins.Initialize(); err != nil {
-		panic(fmt.Errorf("error initializing plugins: %s", err))
+		return "", fmt.Errorf("failed to initialise plugins loader: %w", err)
 	}
-
 	if err := plugins.Inject(); err != nil {
-		panic(fmt.Errorf("error initializing plugins: %s", err))
+		return "", fmt.Errorf("failed to inject plugins: %w", err)
 	}
 
-	// Create the repo with the config
-	err = fsrepo.Init(repoPath, cfg)
-	if err != nil {
-		return "", fmt.Errorf("failed to init ephemeral node: %s", err)
+	if err := fsrepo.Init(repoPath, cfg); err != nil {
+		return "", fmt.Errorf("failed to init fsrepo: %w", err)
 	}
 
 	return repoPath, nil
@@ -317,10 +363,11 @@ func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 
 // Creates an IPFS node and returns its coreAPI
 func createNode(ctx context.Context, repoPath string) (*core.IpfsNode, error) {
+
 	// Open the repo
 	repo, err := fsrepo.Open(repoPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open repo: %w", err)
 	}
 
 	nodeOptions := &core.BuildCfg{
@@ -333,7 +380,7 @@ func createNode(ctx context.Context, repoPath string) (*core.IpfsNode, error) {
 
 	node, err := core.NewNode(ctx, nodeOptions)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create Node in repo: %s", err)
 	}
 	return node, nil
 
@@ -350,49 +397,123 @@ func spawnEphemeral(ctx context.Context, btstrap []string, swarmKey bool) (iface
 	// Create an IPFS node
 	printErr("repository : %s\n", repoPath)
 	if swarmKey {
-		os.WriteFile(repoPath+"/swarm.key", []byte("/key/swarm/psk/1.0.0/\n/base16/\nedd99a84bbdd5c9cfc06bcc039d219b1000885ecba26901c02e7c8792bfaaa70"), fs.FileMode(os.O_CREATE|os.O_WRONLY|os.O_APPEND))
+		os.WriteFile(repoPath+"/swarm.key", []byte("/key/swarm/psk/1.0.0/\n/base16/\nedd99a84bbdd5c9cfc06bcc039d219b1000885ecba26901c02e7c8792bfaaa70"), 0o600)
 	}
 
 	node, err := createNode(ctx, repoPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to create Node: %s", err)
 	}
+
+	api, err := coreapi.NewCoreAPI(node)
+
 	if swarmKey {
 		node.PNetFingerprint = []byte("4c7dc2a2735a84b4b11ff5b39225aa771cea1abd3acf9b98708a25f286df851c")
 	}
 	// Connect the node to the other private network nodes
+	if btstrap != nil {
+		fmt.Println("trying to going in btstrap loop")
+		for _, addr := range btstrap {
+			fmt.Println("trying to peer.AddrInfoFromString")
+			addresses, err := peer.AddrInfoFromString(addr)
+			if err != nil {
+				panic(fmt.Errorf("addr from P2PADDR : %v \n", err.Error()))
+			}
+			fmt.Printf("providing : %s", addresses)
 
-	api, err := coreapi.NewCoreAPI(node)
+			fmt.Printf("Bootstrap peer ID : %s\n Address total : %s\n", addresses.ID.String(), addresses.String())
+			err = api.Swarm().Connect(context.Background(), *addresses)
+			if err != nil {
+				panic(fmt.Errorf("ERROR Connect  : %v \n(or) %s\n", err.Error(), err.Error()))
+			}
+
+		}
+	}
 
 	return api, node, err
 }
 
-func AddIPFS(ipfs *IpfsLink, message []byte) (ifacepath.Resolved, error) {
+func AddIPFS(ipfs *IpfsLink, message []byte) (blocks.Block, error) {
 
-	peerCidFile, err := ipfs.IpfsCore.Unixfs().Add(ipfs.Ctx,
-		files.NewBytesFile(message))
+	// wrap reader in Unixfs Add
+	// fileAdder := ipfs.IpfsCore.Unixfs().Add
 
+	hash, _ := mh.Sum(message, mh.SHA2_256, -1)
+
+	c := cid.NewCidV1(cid.Raw, hash)
+
+	blk, err := blocks.NewBlockWithCid(message, c)
 	if err != nil {
-		panic(fmt.Errorf("could not add File: %s", err))
+		return nil, fmt.Errorf("newblock issue : %w", err)
 	}
-	go ipfs.IpfsCore.Dht().Provide(ipfs.Ctx, peerCidFile)
-	// if err != nil {
-	// 	panic(fmt.Errorf("Could not provide File - %s", err))
-	// }
-	return peerCidFile, err
+
+	err = ipfs.IpfsNode.Blockstore.Put(context.Background(), blk)
+	if err != nil {
+		return nil, fmt.Errorf("Blockstore Add: %w", err)
+	}
+
+	err = ipfs.IpfsNode.Routing.Provide(context.Background(), c, true)
+	if err != nil {
+		return nil, fmt.Errorf("Blockstore Add: %w", err)
+	}
+
+	var b blocks.Block = blk
+	return b, nil
+
+}
+
+func connectToPeer(h host.Host, addrStr string) error {
+	pi, err := peer.AddrInfoFromString(addrStr)
+	if err != nil {
+		return fmt.Errorf("AddrInfoFromString: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	if err := h.Connect(ctx, *pi); err != nil {
+		return fmt.Errorf("host.Connect(%s): %w", addrStr, err)
+	}
+	return nil
 }
 
 type CID struct{ str string }
 
-func GetIPFS(ipfs *IpfsLink, cids []cid.Cid) ([]files.Node, error) {
-	// str_CID, err := ContentIdentifier.Decode(c)
-
-	var files []files.Node = make([]files.Node, len(cids))
-	var err error
-	var file *os.File
+func GetIPFS(ipfs *IpfsLink, cids []cid.Cid) ([]blocks.Block, time.Duration, time.Duration, error) {
+	// Search for providersr
 
 	ti := time.Now()
-	if len(cids) > 0 {
+
+	for _, c := range cids {
+		fmt.Println("Looking up providers for CID:", c)
+
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*100)
+
+		// FindProvidersAsync returns a channel of peer.AddrInfo
+		provCh := ipfs.IpfsNode.Routing.FindProvidersAsync(ctx, c, 100)
+
+		// Consume the channel
+		for p := range provCh {
+			fmt.Printf("  Provider: %s, addrs: %v\n", p.ID, p.Addrs)
+		}
+
+	}
+
+	timeSeekroviders := time.Since(ti)
+
+	ti = time.Now()
+	// retrieving the files
+	var out []blocks.Block
+
+	blocks := ipfs.IpfsNode.Blocks.GetBlocks(context.Background(), cids)
+
+	for b := range blocks {
+		out = append(out, b)
+	}
+
+	timeRetrieveFile := time.Since(ti)
+
+	var err error
+	var file *os.File
+	if len(out) > 0 {
 
 		file, err = os.OpenFile("node1/time/timeConcurrentRetrieve.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 		if err != nil {
@@ -400,64 +521,14 @@ func GetIPFS(ipfs *IpfsLink, cids []cid.Cid) ([]files.Node, error) {
 		}
 
 		file.WriteString("" +
-			"===============================New Batch of Cid To Retrieve===============================\n" +
-			"=============================The Cids to  Download are thoose=============================\n")
+			"===============================New Batch of Cid To Retrieve===============================\n")
 	}
 
-	wg := sync.WaitGroup{}
-	errhapened := true
-	for errhapened {
-
-		errhapened = false
-		for index, c := range cids {
-
-			if ipfs.ParalelRetrieve {
-				clocal := c
-				wg.Add(1)
-				go func(i int) {
-					str_CID := cids[i]
-					cctx, _ := context.WithDeadline(ipfs.Ctx, time.Now().Add(time.Second*3000))
-					//files[i], err = ipfs.IpfsCore.Dag().Get(cctx, str_CID)
-					array_one := make([]cid.Cid, 1)
-					array_one[0] = str_CID
-					channel_f := ipfs.IpfsCore.Dag().GetMany(cctx, array_one)
-					for f := range channel_f {
-						if f.Node != nil {
-							files[i], _ = ipfs.IpfsCore.Unixfs().Get(cctx, ifacepath.IpfsPath(f.Node.Cid()))
-						} else {
-							err = errors.New("NIL :/")
-							file.WriteString(fmt.Sprintf("Could not get the CID %s, node is NIL \n", cids[i]))
-						}
-					}
-					if err != nil {
-						printErr("could not get file with CID - %s : %s", clocal, err)
-						errhapened = true
-					}
-
-					wg.Done()
-				}(index)
-
-			} else {
-				// It has been asked to be retrieved one by one
-				str_CID := cids[index]
-				cctx, _ := context.WithDeadline(ipfs.Ctx, time.Now().Add(time.Second*3000))
-				array_one := make([]cid.Cid, 1)
-				array_one[0] = str_CID
-				channel_f := ipfs.IpfsCore.Dag().GetMany(cctx, array_one)
-				for f := range channel_f {
-					files[index], _ = ipfs.IpfsCore.Unixfs().Get(cctx, ifacepath.IpfsPath(f.Node.Cid()))
-				}
-			}
-			if ipfs.ParalelRetrieve {
-				wg.Wait()
-			}
-		}
-	}
 	file.WriteString("Got all the cids asked\n")
 	if len(cids) > 0 {
 		file.WriteString("\n" +
 			"Nb of Cids: " + strconv.Itoa(len(cids)) + "\n" +
-			"Time To Download: " + strconv.FormatInt(time.Since(ti).Milliseconds(), 10) + " ms\n" +
+			"Time To seek: " + strconv.FormatInt(timeSeekroviders.Milliseconds(), 10) + " ms\n" + "Time To retrieve: " + strconv.FormatInt(timeRetrieveFile.Milliseconds(), 10) + " ms\n" +
 			"=================================The end of CID retrieval=================================\n" +
 			"\n" +
 			"\n" +
@@ -473,7 +544,7 @@ func GetIPFS(ipfs *IpfsLink, cids []cid.Cid) ([]files.Node, error) {
 			"=================================The end of CID retrieval=================================\n")
 	}
 
-	return files, err
+	return out, timeSeekroviders, timeRetrieveFile, nil
 }
 
 func PubIPFS(ipfs *IpfsLink, msg []byte) {

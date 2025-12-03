@@ -15,7 +15,7 @@ filename=$2
 # subset of interfaces if desired. Capture the first line of output, which is
 # the header row that lists interface names. Count the words and trim the
 # whitespace out of the 'wc' output.
-IFCOUNT=$(ifstat | head -n 1 | wc -w | tr -d ' ')
+#IFCOUNT=$(ifstat | head -n 1 | wc -w | tr -d ' ')
 
 # Calculate the starting and ending offsets of the Total column.
 # Each output column is 20 characters wide in ifstat's "-w" mode
@@ -27,7 +27,7 @@ END=$(( IFCOUNT * COLS_PER_IFACE + COLS_PER_IFACE))
 # Ask for the Total column with -T
 # Suppress periodic header with -n
 # Fixed width output with -w
-ifstat -n -w -T 0.1 $((10 * ($experimentation_time - 1) )) | cut -c${START}-${END}  > file
+#ifstat -n -w -T 0.1 $((10 * ($experimentation_time - 1) )) | cut -c${START}-${END}  > file
 
 sed -r 's/[[:blank:]]+/,/g' file > fileBIS
 sed  's/^.//' fileBIS > file2

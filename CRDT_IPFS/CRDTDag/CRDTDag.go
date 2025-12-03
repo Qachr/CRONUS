@@ -20,9 +20,8 @@ import (
 
 	IpfsLink "IPFS_CRDT/ipfsLink"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	Files "github.com/ipfs/go-libipfs/files"
-	"github.com/ipfs/interface-go-ipfs-core/path"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"golang.org/x/sync/semaphore"
@@ -175,7 +174,7 @@ func (self *CRDTManager) GetAllNodes() [][]byte {
 func (self *CRDTManager) GetAllNodesInterface() []*CRDTDagNodeInterface {
 	return self.nodesInterface
 }
-func (self CRDTManager) EncodeCid(s path.Resolved) EncodedStr {
+func (self CRDTManager) EncodeCid(s blocks.Block) EncodedStr {
 	b, err := json.Marshal(s.Cid())
 	if err != nil {
 		panic(fmt.Errorf("Couldn't marshall the path, byte :\nerror : %s", err))
@@ -185,7 +184,6 @@ func (self CRDTManager) EncodeCid(s path.Resolved) EncodedStr {
 }
 
 func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string, error) {
-	ti := time.Now()
 	Cids := make([]cid.Cid, len(stringIn))
 
 	for index, s := range stringIn {
@@ -197,59 +195,50 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 		Cids[index] = cid
 	}
 
-	fils, err := IPFSLink.GetIPFS(self.Sys, Cids)
+	fils, timeSeekroviders, timeRetrieveFile, err := IPFSLink.GetIPFS(self.Sys, Cids)
 	if err != nil {
 		panic(fmt.Errorf("issue retrieving the IPFS Node :%s", err))
 	}
 	filees_ret := make([]string, 0)
+	timeseek := 0
 	timeDownload := 0
 	if len(fils) > 0 {
-		timeDownload = int(time.Since(ti).Nanoseconds()) / len(fils)
+		timeseek = int(timeSeekroviders.Nanoseconds()) / len(fils)
+		timeDownload = int(timeRetrieveFile.Nanoseconds()) / len(fils)
 	}
-	for _, fil := range fils {
+	for _, block := range fils {
 		ti := time.Now()
 		fstr := self.nextFileName2()
+		filees_ret = append(filees_ret, fstr)
 		_ = os.Remove(fstr) // In cas the file where already existing ( which should never be the case)
 
-		filees_ret = append(filees_ret, fstr)
-
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		Files.WriteTo(fil, fstr)
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!! (botleneck for mispelling)25
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-
-		time_Retrieve := timeDownload + int(time.Since(ti).Nanoseconds())
 		// If data has been encoded, We decode it here : \/
 		ti = time.Now()
 		if self.Key != "" {
-			dataEncoded, err := os.ReadFile(fstr)
-			if err != nil {
-				panic(fmt.Errorf("error, could not read data to decrypt it\nError: %s", err))
-			}
+			dataEncoded := block.RawData()
+
 			dataClear := decrypt(self.Key, string(dataEncoded))
 
-			os.Remove(fstr)
-			if _, err := os.Stat(fstr); !errors.Is(err, os.ErrNotExist) {
-				os.Remove(fstr)
-			}
 			fil, err := os.OpenFile(fstr, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the sub file to write encoded data\nError: %s", err))
 			}
 			_, err = fil.Write([]byte(dataClear))
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the sub file to write encoded data\nError: %s", err))
+			}
+			err = fil.Close()
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the sub file to write encoded data \nError: %s", err))
+			}
+		} else {
+			// If data has not been encoded, We Write it directly : \/
+
+			fil, err := os.OpenFile(fstr, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the sub file to write encoded data\nError: %s", err))
+			}
+			_, err = fil.Write(block.RawData())
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the sub file to write encoded data\nError: %s", err))
 			}
@@ -270,7 +259,7 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
 			}
-			_, err = fil.Write([]byte(strconv.Itoa(time_Retrieve)))
+			_, err = fil.Write([]byte(strconv.Itoa(timeDownload)))
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
 			}
@@ -278,6 +267,24 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
 			}
+
+			fstrBis = fstr + ".timeSeek"
+			if _, err := os.Stat(fstrBis); !errors.Is(err, os.ErrNotExist) {
+				os.Remove(fstrBis)
+			}
+			fil, err = os.OpenFile(fstrBis, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
+			}
+			_, err = fil.Write([]byte(strconv.Itoa(timeseek)))
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
+			}
+			err = fil.Close()
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
+			}
+
 			if self.Key != "" {
 				fstrBis = fstr + ".timeDecrypt"
 				if _, err := os.Stat(fstrBis); !errors.Is(err, os.ErrNotExist) {
@@ -623,7 +630,7 @@ func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNode
 	self.UpdateRootNodeFolder()
 
 }
-func (self *CRDTManager) AddToIPFS(ipfs *IpfsLink.IpfsLink, message []byte, args ...*int) (path.Resolved, error) {
+func (self *CRDTManager) AddToIPFS(ipfs *IpfsLink.IpfsLink, message []byte, args ...*int) (blocks.Block, error) {
 	ti := time.Now()
 	if self.Key != "" {
 		message = []byte(encrypt(self.Key, string(message)))
