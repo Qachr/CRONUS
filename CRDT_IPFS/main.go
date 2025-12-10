@@ -53,7 +53,7 @@ func main() {
 		Updating:         *updating,
 		WaitTime:         *waitTime,
 		SyncTime:         *syncTime,
-		TestMode:         true,  // retrieve 20 by 20 the CIDs (now its 30)
+		TestMode:         true,  // retrieve 20 by 20 the CIDs (now its 40)
 		RROptimisation:   false, // Remove redundancy
 		BPOptimisation:   false, // avoid back propagation
 	}
