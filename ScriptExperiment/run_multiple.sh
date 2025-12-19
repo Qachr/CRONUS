@@ -9,11 +9,11 @@ fileNODE=$1
 
 #              
 ARRAY_WAITTIME=( 500 )
-ARRAY_SyncTime=( 1 )
-ARRAY_Repetition=( 1 ) # 4 5 )
-ARRAY_NbPeers=( 1 10 12 13 15 20 30 48 ) # 30 50 
+ARRAY_SyncTime=( 1 3 )
+ARRAY_Repetition=( 1 2 3 ) # 4 5 )
+ARRAY_NbPeers=(  30 40 ) # 30 50 
 ARRAY_UpdatesNb=( 500 ) # 400 600 800 1000 ) #  10 100 
-ARRAY_NbPeers_Updating=( 10 30 48 ) # 
+ARRAY_NbPeers_Updating=( 1 ) # 
 
 
 

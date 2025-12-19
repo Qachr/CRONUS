@@ -66,6 +66,94 @@ The `example` folder contains several CRDT definitions integrated with the Merkl
 
 ---
 
+
+### **Detailled algorithm used**
+
+\subsection{CRDT Algorithms}\label{Appendix:CRDTalgorithms}
+
+The CRDT definitions that are being used in \sys are 2P-Set for Operation-based \cite{Shapiro2011}, CLSet for State-based and $\delta$-CLSet for Delta-based \cite{YuSMDS20, CLSet}. The implementations used are being depicted in Algorithm~\ref{alg:update_op-based},\ref{alg:update_state-based} and~\ref{alg:update_delta-based}. For clarity, the set elements are treated as strings, and uniqueness is ensured by attaching a timestamp and the peer identifier to each element.
+
+    Algorithm: Operation-based 2P-Set
+
+    Requirements:
+      (S_A, S_R) ∈ String Set × String Set
+      u ∈ {(t, s) | t ∈ {add, remove}, s ∈ String}
+
+    Procedure ManageUpdate(S, u):
+      (t, s) ← u
+
+      if (t == add) then
+        S_A ← S_A ∪ {s}
+      else if (t == remove) then
+        S_R ← S_R ∪ {s}
+      end if
+
+      SendPayload(json(u))
+
+    Procedure SendPayload(m):
+      Cid ← IPFS.Send(Merkle-CRDTNode(m))
+      Pubsub.emit(Cid)
+
+
+
+Operation-based 2P-Set uses two subsets to represent the sets $S_A$ and $S_R$. All added elements are stored in $S_A$, and all removed element are stored in $S_R$. The final set is computed as $S = S_A \setminus S_R$. The payload created while adding or removing elements is \texttt{Add x} if $x$ is being added, or  \texttt{Remove x} if $x$ is being removed. The peers will automatically compute it as $S_A = S_A \cup \{x\}$ or $S_R = S_R \cup \{x\}$ .
+
+    Algorithm: CLSet update in state-based CRDT
+
+    Requirements:
+      S : Map<String, Int>
+
+    Procedure ManageUpdate(S, u):
+      if (u.type == add) then
+        if (S[u.string] is even) then
+          S[u.string] ← S[u.string] + 1
+        end if
+      else if (u.type == remove) then
+        if (S[u.string] is odd) then
+          S[u.string] ← S[u.string] + 1
+        end if
+      end if
+
+    Procedure SendPayload(S):
+      if (S has been modified since last time) then
+        Cid ← IPFS.Send(Merkle-CRDTNode(S.State))
+        Pubsub.emit(Cid)
+      end if
+
+
+
+In the state-based approach, CLSet represents its data using a map $\mathcal M : \texttt{String} \mapsto \mathcal{N}$. An element is considered absent from the node if the number associated with its string is even, and present if the number is odd. When a peer adds or removes an element, it simply increments the corresponding value in the map by one. The state-based payload transmits the entire map, and the merge operation takes the maximum value for each entry.
+
+In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}\delta[x] = \mathcal{M}[x]$ in the sets $S_A$ and $S_R$. The payload then transmits only $\mathcal{M}\delta$, and after each transmission, $\mathcal{M}\delta$ is reset to $\emptyset$.
+
+    Algorithm: CLSet in Delta-based CRDT
+
+    Requirements:
+      S       : Map<String, Int>
+      S_delta : Map<String, Int>
+
+    Procedure ManageUpdate(S, u):
+      (t, s) ← u
+
+      if (u.type == add) then
+        if (S[s] is even) then
+          S[s] ← S[s] + 1
+          S_delta[s] ← S[s]
+        end if
+      else if (u.type == remove) then
+        if (S[s] is odd) then
+          S[s] ← S[s] + 1
+          S_delta[s] ← S[s]
+        end if
+      end if
+
+    Procedure SendPayload(S):
+      if (S_delta != {}) then
+        Cid ← IPFS.Send(Merkle-CRDTNode(S_delta))
+        Pubsub.emit(Cid)
+        S_delta ← {}
+      end if
+      
 ## **Experimental Entry Points**
 
 Although individual CRDTs live in separate folders, **all experiments are launched via `example/tests`**.  
