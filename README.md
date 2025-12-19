@@ -67,13 +67,12 @@ The `example` folder contains several CRDT definitions integrated with the Merkl
 ---
 
 
-### **Detailled algorithm used**
+### **Detailled used algorithm implementation**
 
-\subsection{CRDT Algorithms}\label{Appendix:CRDTalgorithms}
 
-The CRDT definitions that are being used in \sys are 2P-Set for Operation-based \cite{Shapiro2011}, CLSet for State-based and $\delta$-CLSet for Delta-based \cite{YuSMDS20, CLSet}. The implementations used are being depicted in Algorithm~\ref{alg:update_op-based},\ref{alg:update_state-based} and~\ref{alg:update_delta-based}. For clarity, the set elements are treated as strings, and uniqueness is ensured by attaching a timestamp and the peer identifier to each element.
+The CRDT definitions that are being used in \sys are 2P-Set for Operation-based, CLSet for State-based and $\delta$-CLSet for Delta-based. The implementations used are being depicted in Algorithm 1, 2 and 3. For clarity, the set elements are treated as strings, and uniqueness is ensured by attaching a timestamp and the peer identifier to each element.
 
-    Algorithm: Operation-based 2P-Set
+__<u>Algorithm 1 : Operation-based 2P-Set</u>__
 
     Requirements:
       (S_A, S_R) ∈ String Set × String Set
@@ -98,7 +97,7 @@ The CRDT definitions that are being used in \sys are 2P-Set for Operation-based 
 
 Operation-based 2P-Set uses two subsets to represent the sets $S_A$ and $S_R$. All added elements are stored in $S_A$, and all removed element are stored in $S_R$. The final set is computed as $S = S_A \setminus S_R$. The payload created while adding or removing elements is \texttt{Add x} if $x$ is being added, or  \texttt{Remove x} if $x$ is being removed. The peers will automatically compute it as $S_A = S_A \cup \{x\}$ or $S_R = S_R \cup \{x\}$ .
 
-    Algorithm: CLSet update in state-based CRDT
+__<u>Algorithm 2 : CLSet update in state-based CRDT</u>__
 
     Requirements:
       S : Map<String, Int>
@@ -126,7 +125,7 @@ In the state-based approach, CLSet represents its data using a map $\mathcal M :
 
 In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}\delta[x] = \mathcal{M}[x]$ in the sets $S_A$ and $S_R$. The payload then transmits only $\mathcal{M}\delta$, and after each transmission, $\mathcal{M}\delta$ is reset to $\emptyset$.
 
-    Algorithm: CLSet in Delta-based CRDT
+__<u>Algorithm 3 : CLSet in Delta-based CRDT</u>__
 
     Requirements:
       S       : Map<String, Int>
