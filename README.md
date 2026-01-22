@@ -106,6 +106,12 @@ __<u>Algorithm 2 : CLSet update in state-based CRDT</u>__
       if (u.type == add) then
         if (S[u.string] is even) then
           S[u.string] ← S[u.string] + 1
+        Pubsub.emit(Cid)
+        S_delta ← {}
+      end if
+      
+
+In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}_\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}_\delta[x] = \mathcal{M}[x]$ in the sets $S_
         end if
       else if (u.type == remove) then
         if (S[u.string] is odd) then
@@ -121,9 +127,13 @@ __<u>Algorithm 2 : CLSet update in state-based CRDT</u>__
 
 
 
-In the state-based approach, CLSet represents its data using a map $\mathcal M : \texttt{String} \mapsto \mathcal{N}$. An element is considered absent from the node if the number associated with its string is even, and present if the number is odd. When a peer adds or removes an element, it simply increments the corresponding value in the map by one. The state-based payload transmits the entire map, and the merge operation takes the maximum value for each entry.
+In the state-based approach, CLSet represents its data using a map $\mathcal M : \texttt{String} \mapsto \mathcal{N}$. An element is considered absent from the node if the number associated with its string is ev
+        Pubsub.emit(Cid)
+        S_delta ← {}
+      end if
+      
 
-In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}\delta[x] = \mathcal{M}[x]$ in the sets $S_A$ and $S_R$. The payload then transmits only $\mathcal{M}\delta$, and after each transmission, $\mathcal{M}\delta$ is reset to $\emptyset$.
+In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}_\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}_\delta[x] = \mathcal{M}[x]$ in the sets $S_en, and present if the number is odd. When a peer adds or removes an element, it simply increments the corresponding value in the map by one. The state-based payload transmits the entire map, and the merge operation takes the maximum value for each entry.
 
 __<u>Algorithm 3 : CLSet in Delta-based CRDT</u>__
 
@@ -153,6 +163,10 @@ __<u>Algorithm 3 : CLSet in Delta-based CRDT</u>__
         S_delta ← {}
       end if
       
+
+In the delta-based $\delta$-CLSet, the data is represented in the same way as in the state-based version, but with an additional map $\mathcal{M}_\delta$. The add and remove operations behave identically; however, whenever the main map $\mathcal{M}$ is updated for a string $x$, the delta map is also updated so that $\mathcal{M}_\delta[x] = \mathcal{M}[x]$ in the sets $S_A$ and $S_R$. The payload then transmits only $\mathcal{M}_\delta$, and after each transmission, $\mathcal{M}_\delta$ is reset to $\emptyset$.
+
+
 ## **Experimental Entry Points**
 
 Although individual CRDTs live in separate folders, **all experiments are launched via `example/tests`**.  
