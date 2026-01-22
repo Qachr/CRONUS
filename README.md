@@ -27,20 +27,16 @@ CRDT_IPFS/
   │   ├── LogootOpBased/    # Work-in-progress CRDT
   ├── ipfsLink/             # IPFS wrapper (DAG ops, publish/subscribe, connections)
   ├── Payload/              # Data structures stored as CID-addressed payloads
-  ├── Config/               # Experiment configuration options
-  ├── g5kRunners/           # Helpers for running on Grid5000
+  ├── Config/               # Experiment configuration options definition
   ├── main.go               # Experiment launcher selecting the scenario
-  ├── TexFiles/             # Paper fragments and generated PDFs
   └── tuto_IPFS_Deployment.md
 
 ```
 
 Other top-level folders:
 
-- **General Workflow/** — Draw.io diagrams and visuals used in the work  
-- **ScriptExperiment/** — Shell scripts and R tools for running/collecting results on Grid5000  
-- **toremove/kad/** — Vendored copy of go-libp2p-kad-dht (kept for reproducibility)  
-- **output.csv**, **latencyTime_new.ods** — Example outputs  
+- **ScriptExperiment/** — Shell scripts and R tools for running/collecting results on Grid5000
+- send_files.sh input —  compress CRDT_IPFS and send it to input
 
 ---
 
@@ -173,12 +169,11 @@ Although individual CRDTs live in separate folders, **all experiments are launch
 These files behave as main entry points depending on configuration.
 
 Examples include:
-- `Comparison_CRDT.go`  (For 2P set)
+- `Comparison_CRDT.go`  (For 2P set - Operation-based)
 - `Comparison_CRDT_StateBased.go`  
 - `Comparison_CRDT_DeltaBased.go`  
 - `Comparison_CRDT_LogootOpBased.go`  
-- `Comparison_CRDT_NoCRDT.go`  
-- `Sharing_Files_test.go`  
+- `Comparison_CRDT_NoCRDT.go`  (For IPFS only experiment)
 
 The root `main.go` file loads parameters and dispatches execution to these test modules.
 
@@ -254,7 +249,7 @@ Configuration options determine:
 
 The `ScriptExperiment` folder includes all scripts used to deploy nodes, control execution, and collect results on the Grid5000 testbed.
 
-Key components: (TODO)  
+Key components: ``
 
 
 These scripts are provided for transparency and reproducibility.
@@ -267,7 +262,7 @@ This framework is designed for people wishing to develop or benchmark new CRDTs 
 
 ### To implement a new CRDT:
 1. Create a new folder inside `example/`
-2. Implement: (TODO, mention the explaination)
+2. Implement: follow the template provided in example "empty"
     
 3. Add an experiment entry point in `example/tests/`
 4. Configure the corresponding experiment parameters
@@ -276,5 +271,4 @@ The architecture is modular and intended to facilitate experimentation and repro
 
 ## **Contact**
 
-This repository is anonymized for the review process.  
-Contact information will be added after the review period.
+This repository is anonymized for the review process.
