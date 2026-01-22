@@ -228,28 +228,23 @@ go build
 
 ### Run 
 
-Most experiments are controlled through the experiment's configuration data "config.cfg" that is set-up thanks to flags defin :
-- TODO Describe the flags
+Most experiments are controlled through the experiment's configuration data "config.cfg" that is set-up thanks to its flags 
 
-
-Usage :
-```
- TODO
-```
 
 Configuration options determine:
-- The CRDT to use
 - Number of peers
 - Update patterns
 - Delays / timers
 - Storage locations
 - Debug vs. experiment mode
 
+The CRDT to use is defined with the function being called in `main.go` 
+
 ## **Running Experiments on Grid5000 (G5K)**
 
 The `ScriptExperiment` folder includes all scripts used to deploy nodes, control execution, and collect results on the Grid5000 testbed.
 
-Key components: ``
+File I use to start experiment, calling the other files: `ScriptExperiment/run_multiple.sh`
 
 
 These scripts are provided for transparency and reproducibility.
