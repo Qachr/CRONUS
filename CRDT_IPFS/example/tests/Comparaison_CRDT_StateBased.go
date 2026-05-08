@@ -301,6 +301,8 @@ func doUpdates(nbUpdates int, SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ st
 }
 
 func SendState(SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ string, file *os.File, netID string, sema *semaphore.Weighted, cfg Config.CRONUSConfig) {
+	first := false
+	time_first := time.Now()
 	fileWrite, _ := os.OpenFile(SetCrdt1.GetCRDTManager().Nodes_storage_enplacement+"/time/FileWrite.log", os.O_CREATE|os.O_WRONLY, 0755)
 	fileWrite.WriteString(fmt.Sprintf("starting the Set, Sending my state every %d s\n", cfg.SyncTime))
 	ti := time.Now()
@@ -312,10 +314,14 @@ func SendState(SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ string, file *os.
 	for {
 		time.Sleep(100 * time.Microsecond)
 
-		if time.Since(ti) >= time.Second*time.Duration(cfg.SyncTime) {
+		if time.Since(ti) >= time.Second*time.Duration(cfg.SyncTime) && time.Since(time_first) <= 600*time.Second {
 			getSema(sema, context.Background())
 			fileWrite.WriteString("updating the data\n")
 			encodedCid, times := SetCrdt1.SendState()
+			if first == false {
+				first = true
+				time_first = time.Now()
+			}
 			fileWrite.WriteString("updating the data - taking sema\n")
 			fileWrite.WriteString("Semaphore tooken\n")
 			file.WriteString(encodedCid + "," + strconv.Itoa(GetTime(ntpServ)) + "," + "0,0,0," + strconv.Itoa(times.Time_add) + "," + strconv.Itoa(times.Time_encrypt) + ",0,0,0,0," + strconv.Itoa(times.FileSize) + "\n")

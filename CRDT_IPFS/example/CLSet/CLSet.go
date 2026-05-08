@@ -245,7 +245,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) IsKnown(cid CRDTDag.EncodedStr) bool 
 	}
 	return find
 }
-func (thisCRDTDag *CRDTCLSetStateBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
+func (thisCRDTDag *CRDTCLSetStateBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]string, []([]byte)) {
 
 	to_add := make([]CRDTDag.EncodedStr, 0)
 	for _, cid := range cids {
@@ -271,7 +271,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) Merge(cids []CRDTDag.EncodedStr) []st
 			thisCRDTDag.modified = thisCRDTDag.modified || modif
 		}
 	}
-	return fils
+	return fils, make([]([]byte), 0) //TODO resend not planned CIDs
 }
 
 func (thisCRDTDag *CRDTCLSetStateBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTCLSetStateBasedDagNode) {
@@ -650,7 +650,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) add_cids(to_add []([]byte), computeti
 		bytes_encoded = append(bytes_encoded, CRDTDag.EncodedStr{Str: bytesread})
 	}
 
-	filesWritten := thisCRDTDag.Merge(bytes_encoded)
+	filesWritten, _ := thisCRDTDag.Merge(bytes_encoded) //TODO receive not planned CIDs
 
 	for index, bytesread := range to_add {
 		s := cid.Cid{}

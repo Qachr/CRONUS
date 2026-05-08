@@ -269,7 +269,7 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) IsKnown(cid CRDTDag.EncodedStr) bool 
 	}
 	return find
 }
-func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
+func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]string, []([]byte)) {
 
 	to_add := make([]CRDTDag.EncodedStr, 0)
 	for _, cid := range cids {
@@ -292,7 +292,7 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) []st
 		state_withDelta := State{DeltaState: (*n.DagNode.Event).(*PayloadDeltaBased).SetDeltaState, SetData: make(map[Element]int, 0)}
 		thisCRDTDag.setValue.SetState.mergeState(state_withDelta)
 	}
-	return fils
+	return fils, make([]([]byte), 0) //TODO resend not planned CIDs
 }
 
 func (thisCRDTDag *CRDTCLSetDeltaBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTCLSetDeltaBasedDagNode) {
@@ -657,7 +657,7 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) add_cids(to_add []([]byte), computeti
 		bytes_encoded = append(bytes_encoded, CRDTDag.EncodedStr{Str: bytesread})
 	}
 
-	filesWritten := thisCRDTDag.Merge(bytes_encoded)
+	filesWritten, _ := thisCRDTDag.Merge(bytes_encoded) // TODO ECEIVE NOT PREVIEWED CIDs
 
 	for index, bytesread := range to_add {
 		s := cid.Cid{}

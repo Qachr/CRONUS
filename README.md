@@ -245,6 +245,7 @@ The CRDT to use is defined with the function being called in `main.go`
 The `ScriptExperiment` folder includes all scripts used to deploy nodes, control execution, and collect results on the Grid5000 testbed.
 
 File I use to start experiment, calling the other files: `ScriptExperiment/run_multiple.sh`
+This file requires a 
 
 
 These scripts are provided for transparency and reproducibility.

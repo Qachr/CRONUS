@@ -41,10 +41,11 @@ func Peer1IPFS(cfg Config.CRONUSConfig) {
 		panic(fmt.Errorf("error openning file file\nerror : %s", err))
 	}
 
-	ti := time.Now()
+	ti := time.Now() // time for how frequently to send update
+	t0 := time.Now() // time for how long the exp last
 	time.Sleep(60 * time.Second)
 	k := 0
-	for k < cfg.UpdatesNB {
+	for time.Since(t0) < time.Duration(cfg.UpdatesNB+10)*time.Second {
 		time.Sleep(30 * time.Microsecond)
 
 		time_start := time.Now()
@@ -55,7 +56,7 @@ func Peer1IPFS(cfg Config.CRONUSConfig) {
 		// x := SetCrdt1.Lookup()
 		// fmt.Println("New Value of the Set:", x)
 
-		if time.Since(ti) >= time.Millisecond*1000 {
+		if time.Since(ti) >= time.Duration(cfg.SyncTime)*time.Millisecond {
 			t := strconv.Itoa(GetTime(""))
 			time_start = time.Now()
 			encodedCid := SetCrdt1.Add(sys1.Cr.Id + "VALUE ADDED" + strconv.Itoa(k))

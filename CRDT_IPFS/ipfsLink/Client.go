@@ -118,8 +118,7 @@ func InitClient(name string, bootstrapPeer string) *Client {
 
 	ps, topic, sub := SetupPubSub(host, ctx, TOPIC_NAME)
 	P2PsetupDiscovery(host, ctx, dhtV)
-
-	return &Client{
+	c := &Client{
 		Ctx:   ctx,
 		Name:  name,
 		Host:  host,
@@ -129,7 +128,15 @@ func InitClient(name string, bootstrapPeer string) *Client {
 		Sub:   sub,
 		Id:    idd,
 	}
+
+	setupVariousCapacity(c)
+	return c
 }
+
+func setupVariousCapacity(c *Client) {
+
+}
+
 func (client *Client) Close() {
 	// if err := client.topic.Close(); err != nil {
 	// 	panic(fmt.Errorf("IPFSLink - Close, could not Close Topic\nerror: %s", err))

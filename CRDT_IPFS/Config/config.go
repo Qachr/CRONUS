@@ -13,6 +13,7 @@ type CRONUSConfig struct {
 	TotalNbUpdate    int
 	WaitTime         int
 	SyncTime         int
+	DelayTime        int
 	Updating         bool
 	Measurement      bool
 	NtpServ          string

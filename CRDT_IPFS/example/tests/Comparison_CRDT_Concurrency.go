@@ -38,9 +38,93 @@ func returnSema(sema *semaphore.Weighted) {
 	sema.Release(1)
 }
 
+// type TimeTuple struct {
+// 	Cid            string
+// 	RetrievalAlone int
+// 	SeekAlone      int
+// 	RetrievalTotal int
+// 	SeekTotal      int
+// 	CalculTime     int
+// 	Time_add       int
+// 	Time_encrypt   int
+// 	Time_decrypt   int
+// 	ArrivalTime    int
+// 	FileSize       int
+
+// 	TimeTotal            int
+// 	TimeFolder           int
+// 	TimefilesMeasurement int
+
+// 	TimeselfaddCIDs               int
+// 	TimeGetSema                   int
+// 	Timeselfupdaterootdnodefolder int
+
+// 	TimeMerge int
+// }
+
+func lineOflogtime(timetuple Set.TimeTuple) string {
+	t := strconv.Itoa(int(time.Now().UnixNano()))
+
+	s := ""
+	s = s + timetuple.Cid + ","
+	s = s + t + ","
+	s = s + strconv.Itoa(timetuple.SeekAlone) + ","
+	s = s + strconv.Itoa(timetuple.RetrievalAlone) + ","
+	s = s + strconv.Itoa(timetuple.CalculTime) + ","
+	s = s + strconv.Itoa(timetuple.Time_add) + ","
+	s = s + strconv.Itoa(timetuple.Time_encrypt) + ","
+	s = s + strconv.Itoa(timetuple.Time_decrypt) + ","
+	s = s + strconv.Itoa(timetuple.SeekTotal) + ","
+	s = s + strconv.Itoa(timetuple.RetrievalTotal) + ","
+	s = s + strconv.Itoa(timetuple.ArrivalTime) + ","
+	s = s + strconv.Itoa(timetuple.FileSize) + ","
+
+	if true {
+		s = s + strconv.Itoa(timetuple.TimeTotal) + ","
+		s = s + strconv.Itoa(timetuple.TimeFolder) + ","
+		s = s + strconv.Itoa(timetuple.TimefilesMeasurement) + ","
+
+		s = s + strconv.Itoa(timetuple.TimeselfaddCIDs) + ","
+		s = s + strconv.Itoa(timetuple.TimeGetSema) + ","
+		s = s + strconv.Itoa(timetuple.Timeselfupdaterootdnodefolder) + ","
+
+		s = s + strconv.Itoa(timetuple.TimeMerge)
+
+	}
+
+	if true {
+		s = s + ","
+		s = s + strconv.Itoa(timetuple.TimeReadinMerge) + ","
+		s = s + strconv.Itoa(timetuple.TimeGetinMerge) + ","
+		s = s + strconv.Itoa(timetuple.ForloopinMerge) + ","
+		s = s + strconv.Itoa(timetuple.TimeCreateDAGNODE) + ","
+		s = s + strconv.Itoa(timetuple.TimeFromFile) + ","
+		s = s + strconv.Itoa(timetuple.TimeremoteAddNodefor)
+	}
+
+	if true {
+		s = s + ","
+		s = s + strconv.Itoa(timetuple.CheckDependency) + ","
+		s = s + strconv.Itoa(timetuple.GetNodeFromEncoded) + ","
+		s = s + strconv.Itoa(timetuple.CreateNodeFromFile) + ","
+		s = s + strconv.Itoa(timetuple.TimeAddNodeInCRDTDAG)
+	}
+
+	return s
+}
+
+func getHEADLINE() string {
+	s := "CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize"
+	if true {
+		s = s + ",TimeTotal,TimeFolder,TimefilesMeasurement,TimeselfaddCIDs,TimeGetSema,Timeselfupdaterootdnodefolder,TimeMerge,TimeReadinMerge,TimeGetinMerge,ForloopinMerge,TimeCreateDAGNODE,TimeFromFile,TimeremoteAddNodefor,CheckDependency,GetNodeFromEncoded,CreateNodeFromFile,TimeAddNodeInCRDTDAG"
+	}
+	return s
+}
+
 // \/ BOOTSTRAP PEER IS THIS ONE \/
 func Peer1Concu(cfg Config.CRONUSConfig) {
 	fileRead, err := os.OpenFile(cfg.PeerName+"/time/FileRead.log", os.O_CREATE|os.O_WRONLY, 0755)
+	logFile, err := os.OpenFile(cfg.PeerName+"/time/logIPFSBitswapStat.log", os.O_CREATE|os.O_WRONLY, 0755)
 	file, err := os.OpenFile(cfg.PeerName+"/time/time.csv", os.O_CREATE|os.O_WRONLY, 0755)
 	sema := semaphore.NewWeighted(1)
 
@@ -70,7 +154,7 @@ func Peer1Concu(cfg Config.CRONUSConfig) {
 
 	fileRead.WriteString("Taking Sema to write headers ... ")
 	getSema(sema, sys1.Ctx)
-	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString(getHEADLINE() + "\n")
 	returnSema(sema)
 	fileRead.WriteString("Header just written\n")
 	if err != nil {
@@ -98,21 +182,13 @@ func Peer1Concu(cfg Config.CRONUSConfig) {
 			strList = SetCrdt1.CheckUpdate(sema)
 		}
 		if len(strList) > 0 {
-			fileRead.WriteString("Just Received some updates\n")
-			t := strconv.Itoa(GetTime(cfg.NtpServ))
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
 
+			fileRead.WriteString("Just Received some updates\n")
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," +
-					t + "," +
-					strconv.Itoa(strList[j].SeekAlone) + "," +
-					strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) +
-					",0,0," +
-					strconv.Itoa(strList[j].Time_decrypt) + "," +
-					strconv.Itoa(strList[j].SeekTotal) + "," +
-					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
-					strconv.Itoa(strList[j].FileSize) + "\n")
+				file.WriteString(lineOflogtime(strList[j]) + "\n")
 				returnSema(sema)
 				fileRead.WriteString("writing 1 line\n")
 			}
@@ -124,7 +200,7 @@ func Peer1Concu(cfg Config.CRONUSConfig) {
 	ti = time.Now()
 
 	// Send updates concurrently every 1 seconds
-	go sendUpdates(cfg.UpdatesNB, &SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema, cfg)
+	go sendUpdates(cfg.UpdatesNB, &SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema, cfg, logFile, sys1)
 
 	//regularly scan files if there is any new received updates
 	for {
@@ -144,18 +220,15 @@ func Peer1Concu(cfg Config.CRONUSConfig) {
 			strList = SetCrdt1.CheckUpdate(sema)
 		}
 		if len(strList) > 0 {
+
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
+
 			fileRead.WriteString("Just Received some updates\n")
-			t := strconv.Itoa(GetTime(cfg.NtpServ))
 
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," +
-					strconv.Itoa(strList[j].SeekAlone) + "," +
-					strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
-					strconv.Itoa(strList[j].SeekTotal) + "," +
-					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
-					strconv.Itoa(strList[j].FileSize) + "\n")
+				file.WriteString(lineOflogtime(strList[j]) + "\n")
 				returnSema(sema)
 				fileRead.WriteString("writing 1 line\n")
 			}
@@ -169,6 +242,9 @@ func Peer1Concu(cfg Config.CRONUSConfig) {
 func Peer2Concu(cfg Config.CRONUSConfig) {
 	IPFSbootstrapBytes, err := os.ReadFile(cfg.IPFSbootstrap)
 	sema := semaphore.NewWeighted(1)
+
+	time.Sleep(time.Duration(cfg.DelayTime) * time.Second)
+
 	if err != nil {
 		panic(fmt.Errorf("failed to read ipfs bootstrap peer multiaddr : %s", err))
 	}
@@ -182,8 +258,10 @@ func Peer2Concu(cfg Config.CRONUSConfig) {
 	SetCrdt1 := Set.Create_CRDTSetOpBasedDag(sys1, cfg)
 	returnSema(sema)
 
+	logFile, err := os.OpenFile(cfg.PeerName+"/time/logIPFSBitswapStat.log", os.O_CREATE|os.O_WRONLY, 0755)
+
 	file, err := os.OpenFile(cfg.PeerName+"/time/time.csv", os.O_CREATE|os.O_WRONLY, 0755)
-	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString(getHEADLINE() + "\n")
 	if err != nil {
 		panic(fmt.Errorf("error openning file file\nerror : %s", err))
 	}
@@ -191,7 +269,7 @@ func Peer2Concu(cfg Config.CRONUSConfig) {
 	if err != nil {
 		panic(fmt.Errorf("error openning file file\nerror : %s", err))
 	}
-	fmt.Printf("Starting the Set, updating %d times\n", cfg.UpdatesNB)
+	fmt.Printf("Starting the Set, Not updating and reading now\n", cfg.UpdatesNB)
 	var strList []Set.TimeTuple
 	for {
 		strList = make([]Set.TimeTuple, 0)
@@ -213,16 +291,12 @@ func Peer2Concu(cfg Config.CRONUSConfig) {
 			strList = SetCrdt1.CheckUpdate(sema)
 		}
 		if len(strList) > 0 {
-			t := strconv.Itoa(GetTime(cfg.NtpServ))
+
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
 
 			for j := 0; j < len(strList); j++ {
-				file.WriteString(strList[j].Cid + "," + t + "," +
-					strconv.Itoa(strList[j].SeekAlone) + "," +
-					strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
-					strconv.Itoa(strList[j].SeekTotal) + "," +
-					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
-					strconv.Itoa(strList[j].FileSize) + "\n")
+				file.WriteString(lineOflogtime(strList[j]) + "\n")
 			}
 		}
 
@@ -232,6 +306,10 @@ func Peer2Concu(cfg Config.CRONUSConfig) {
 
 func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 	sema := semaphore.NewWeighted(1)
+
+	time.Sleep(time.Duration(cfg.DelayTime) * time.Second)
+
+	logFile, err := os.OpenFile(cfg.PeerName+"/time/logIPFSBitswapStat.log", os.O_CREATE|os.O_WRONLY, 0755)
 
 	// Reading the IPFSBootstrap file
 	fileInfo, err := os.Stat(cfg.IPFSbootstrap)
@@ -266,7 +344,7 @@ func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 	fileRead, err := os.OpenFile(cfg.PeerName+"/time/FileRead.log", os.O_CREATE|os.O_WRONLY, 0755)
 	fileRead.WriteString("Taking Sema to write headers ... ")
 	getSema(sema, sys1.Ctx)
-	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString(getHEADLINE() + "\n")
 	returnSema(sema)
 	fileRead.WriteString("Header just written\n")
 	if err != nil {
@@ -294,18 +372,15 @@ func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 			strList = SetCrdt1.CheckUpdate(sema)
 		}
 		if len(strList) > 0 {
+
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
+
 			fileRead.WriteString("Just Received some updates\n")
-			t := strconv.Itoa(GetTime(cfg.NtpServ))
 
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," +
-					strconv.Itoa(strList[j].SeekAlone) + "," +
-					strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
-					strconv.Itoa(strList[j].SeekTotal) + "," +
-					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
-					strconv.Itoa(strList[j].FileSize) + "\n")
+				file.WriteString(lineOflogtime(strList[j]) + "\n")
 				returnSema(sema)
 				fileRead.WriteString("writing 1 line in time.csv\n")
 			}
@@ -314,7 +389,7 @@ func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 	}
 
 	// Send updates concurrently every 1 seconds
-	go sendUpdates(cfg.UpdatesNB, &SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema, cfg)
+	go sendUpdates(cfg.UpdatesNB, &SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema, cfg, logFile, sys1)
 
 	//regularly scan files if there is any new received updates
 	fmt.Printf("Starting the Set, updating %d times\n", cfg.UpdatesNB)
@@ -338,17 +413,15 @@ func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 		}
 
 		if len(strList) > 0 {
+
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
+
 			fileRead.WriteString("Just Received some updates\n")
-			t := strconv.Itoa(GetTime(cfg.NtpServ))
+
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," +
-					strconv.Itoa(strList[j].SeekAlone) + "," +
-					strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
-					strconv.Itoa(strList[j].SeekTotal) + "," +
-					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
-					strconv.Itoa(strList[j].FileSize) + "\n")
+				file.WriteString(lineOflogtime(strList[j]) + "\n")
 				returnSema(sema)
 				fileRead.WriteString("writing 1 line\n")
 			}
@@ -363,7 +436,7 @@ func Peer2ConcuUpdate(cfg Config.CRONUSConfig) {
 
 var letterRunes = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func sendUpdates(nbUpdates int, SetCrdt1 *Set.CRDTSetOpBasedDag, ntpServ string, file *os.File, netID string, sema *semaphore.Weighted, cfg Config.CRONUSConfig) {
+func sendUpdates(nbUpdates int, SetCrdt1 *Set.CRDTSetOpBasedDag, ntpServ string, file *os.File, netID string, sema *semaphore.Weighted, cfg Config.CRONUSConfig, logFile *os.File, sys1 *IpfsLink.IpfsLink) {
 	fileWrite, _ := os.OpenFile(SetCrdt1.GetCRDTManager().Nodes_storage_enplacement+"/time/FileWrite.log", os.O_CREATE|os.O_WRONLY, 0755)
 	fileWrite.WriteString(fmt.Sprintf("Starting the Set, updating %d times\n", nbUpdates))
 	defer func(fileWrite *os.File) {
@@ -392,15 +465,55 @@ func sendUpdates(nbUpdates int, SetCrdt1 *Set.CRDTSetOpBasedDag, ntpServ string,
 			getSema(sema, context.Background())
 			fileWrite.WriteString("updating the data\n")
 			encodedCid, times := SetCrdt1.Add(netID + "VALUE ADDED : " + str + strconv.Itoa(k))
+			times.Cid = encodedCid
 			fileWrite.WriteString("updating the data - taking sema\n")
 			fileWrite.WriteString("Semaphore tooken\n")
-			file.WriteString(encodedCid + "," + strconv.Itoa(GetTime(ntpServ)) + "," + "0,0,0," + strconv.Itoa(times.Time_add) + "," + strconv.Itoa(times.Time_encrypt) + ",0,0,0,0," + strconv.Itoa(times.FileSize) + "\n")
+			file.WriteString(lineOflogtime(times) + "\n")
 			fileWrite.WriteString("returning Semaphore\n")
 			fileWrite.WriteString("WRITE - 1 line added to time.csv\n")
 			returnSema(sema)
+
+			//log the bitswap data (before explosing maybe)
+			logNodeInfo(sys1, logFile)
+
 			k++
 			ti = time.Now()
 		}
 
+	}
+}
+
+func logNodeInfo(node *IpfsLink.IpfsLink, file *os.File) {
+	// for now, Avoiding to log too much data for nothing
+	if false {
+		s, e := node.IpfsNode.Bitswap.Stat()
+		if e != nil {
+			fmt.Printf("error when getting stats")
+		}
+		wantlist_me := s.Wantlist
+		blocksentme := s.BlocksSent
+		blockreceivedme := s.BlocksReceived
+		peerslist := s.Peers
+
+		file.WriteString(fmt.Sprintf("{\n    peerlist: "))
+
+		for u := range peerslist {
+			file.WriteString(fmt.Sprintf("%s, ", peerslist[u]))
+		}
+
+		file.WriteString(fmt.Sprintf("{\n    peerlistSize: %d", len(peerslist)))
+
+		file.WriteString(fmt.Sprintf("\n    wantlist: "))
+		for u := range wantlist_me {
+			file.WriteString(fmt.Sprintf("%s, ", wantlist_me[u]))
+		}
+
+		file.WriteString(fmt.Sprintf("\n    wantlistSize: %d", len(wantlist_me)))
+
+		file.WriteString(fmt.Sprintf("\n    wblocksent: %d", blocksentme))
+
+		file.WriteString(fmt.Sprintf("\n    wblockrecieved: %d", blockreceivedme))
+
+		file.WriteString(fmt.Sprintf("\n}\n----\n"))
 	}
 }

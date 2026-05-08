@@ -84,7 +84,7 @@ scp IDBootstrapIPFS root@$SLAVE:~/CRDT_IPFS/IDBootstrapIPFS
 done
 
 sleep 10s
-
+cpt_peer_late=0
 
 for SLAVE in $SLAVES
 do
@@ -118,7 +118,16 @@ echo "NOT updating"
 # ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --encode sataislifesataisloveanditsfor32b --mode update --ni ${BOOTSTRAPID} --name node1 --updatesNB $numberUpdates  > /dev/null &'" &
 # ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --mode=update --ParallelRetrieve=0 --ni=${BOOTSTRAPID} --name=node1 --updatesNB=$numberUpdates  --IPFSBootstrap=IDBootstrapIPFS --WaitTime=$waitTime  --SyncTime=$SyncTime  > /dev/null &'" &
 #ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --mode=update --ParallelRetrieve=0 --ni="/ip4/172.16.76.15/tcp/33941/p2p/12D3KooWBS61qyf8T7LVnT5ZhDbbDz5sx24qJK2vB7H6DQTfQSbe" --name=node1 --updatesNB=50  --IPFSBootstrap=IDBootstrapIPFS --WaitTime=500  --SyncTime=1  > /dev/null &'" &
+if [[ $cpt_peer_late < 1 ]]
+then
+ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --ParallelRetrieve=1 --mode=update --ni=${BOOTSTRAPID} --name=node1 --updatesNB=$numberUpdates  --IPFSBootstrap=IDBootstrapIPFS --WaitTime=$waitTime  --SyncTime=$SyncTime --delay 200  > /dev/null &'" &
+else
+
 ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --ParallelRetrieve=1 --mode=update --ni=${BOOTSTRAPID} --name=node1 --updatesNB=$numberUpdates  --IPFSBootstrap=IDBootstrapIPFS --WaitTime=$waitTime  --SyncTime=$SyncTime  > /dev/null &'" &
+fi
+
+cpt_peer_late=$(( $cpt_peer_late + 1 ))
+
 fi
 
 #ssh root@$SLAVE "sh -c 'cd CRDT_IPFS && ./IPFS_CRDT --mode update --ni ${BOOTSTRAPID} --name node2 > out.log &'"&

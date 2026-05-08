@@ -45,7 +45,7 @@ echo "RunCI"
 echo "Every peers has been started, starting iftop"
 
 sleeptime=$(( $NumberUpdates ))
-margintime=$(( 200 )) # 3600 ))
+margintime=$(( 600 )) # 3600 ))
 
 for SLAVE in $SLAVES
 do

@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	// cft  "github.com/ipfs/kubo/config/types"
 	// "github.com/ipfs/go-cid"
 	// pubsub "github.com/libp2p/go-libp2p-pubsub"
 	// "github.com/libp2p/go-libp2p/core/host"
@@ -67,6 +68,9 @@ import (
 
 	libp2pIFPS "github.com/ipfs/kubo/core/node/libp2p"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+
+	"github.com/dustin/go-humanize"
+	"github.com/pbnjay/memory"
 )
 
 // DiscoveryInterval is how often we re-publish our mDNS records.
@@ -153,7 +157,6 @@ func InitNode(peerName string, bootstrapPeer string, ipfsBootstrap []byte, swarm
 		ipfsA, nodeA, err = spawnEphemeral(ct, nil, swarmKey)
 
 	}
-
 	if err != nil {
 		panic(fmt.Errorf("failed to spawn peer node: %s", err))
 	}
@@ -256,6 +259,37 @@ var LoopBackAddresses = []string{
 
 const PORT = 0
 
+func updateConfigMachineUsage(cfg *config.Config) {
+
+	// FOR now Removing the config update so we have default IPFS
+	if false {
+
+		//Increase limit size to send to peers
+		// cfg.Internal.Bitswap.MaxOutstandingBytesPerPeer = *config.NewOptionalInteger(1 << 30
+
+		// avoid overuse the system
+		cfg.Swarm.ResourceMgr.Enabled = config.True
+		if true {
+
+			cfg.Gateway.MaxConcurrentRequests = config.NewOptionalInteger(0)
+
+			s := config.NewOptionalString(humanize.Bytes(uint64(memory.TotalMemory()) * 9 / 10))
+
+			cfg.Swarm.ResourceMgr.MaxMemory = s
+
+			cfg.Swarm.ConnMgr.HighWater = config.NewOptionalInteger(8000)
+			cfg.Swarm.ConnMgr.LowWater = config.NewOptionalInteger(4000)
+
+		}
+		//next is bitswap values, should be usefull but no clear outcome found
+		cfg.Internal.Bitswap = &config.InternalBitswap{}
+
+		cfg.Internal.Bitswap.TaskWorkerCount = *config.NewOptionalInteger(48)
+		cfg.Internal.Bitswap.EngineTaskWorkerCount = *config.NewOptionalInteger(48)
+		cfg.Internal.Bitswap.EngineBlockstoreWorkerCount = *config.NewOptionalInteger(768)
+	}
+}
+
 func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 	repoPath, err := os.MkdirTemp("", "ipfs-shell")
 
@@ -309,6 +343,7 @@ func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 	cfg.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 
 	cfg.Datastore = config.DefaultDatastoreConfig()
+
 	dataStoreFilePath := filepath.Join(repoPath, "datastore_spec")
 	datastoreContent := map[string]interface{}{
 		"mounts": []interface{}{
@@ -352,6 +387,8 @@ func createTempRepo(BootstrapMultiAddrList []string) (string, error) {
 		return "", fmt.Errorf("failed to inject plugins: %w", err)
 	}
 
+	updateConfigMachineUsage(cfg) // update machine's configuration
+
 	if err := fsrepo.Init(repoPath, cfg); err != nil {
 		return "", fmt.Errorf("failed to init fsrepo: %w", err)
 	}
@@ -382,6 +419,7 @@ func createNode(ctx context.Context, repoPath string) (*core.IpfsNode, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Node in repo: %s", err)
 	}
+
 	return node, nil
 
 }
@@ -510,38 +548,39 @@ func GetIPFS(ipfs *IpfsLink, cids []cid.Cid) ([]blocks.Block, time.Duration, tim
 	}
 
 	timeRetrieveFile := time.Since(ti)
+	if true { // Remove the debug file writing to test if this slows down, turn this false
+		var err error
+		var file *os.File
+		if len(out) > 0 {
 
-	var err error
-	var file *os.File
-	if len(out) > 0 {
+			file, err = os.OpenFile("node1/time/timeConcurrentRetrieve.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("could not Close Debug File in IPFSLink:: GetIPFS\nerror:%s", err))
+			}
 
-		file, err = os.OpenFile("node1/time/timeConcurrentRetrieve.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
-		if err != nil {
-			panic(fmt.Errorf("could not Close Debug File in IPFSLink:: GetIPFS\nerror:%s", err))
+			file.WriteString("" +
+				"===============================New Batch of Cid To Retrieve===============================\n")
 		}
 
-		file.WriteString("" +
-			"===============================New Batch of Cid To Retrieve===============================\n")
-	}
+		file.WriteString("Got all the cids asked\n")
+		if len(cids) > 0 {
+			file.WriteString("\n" +
+				"Nb of Cids: " + strconv.Itoa(len(cids)) + "\n" +
+				"Time To seek: " + strconv.FormatInt(timeSeekroviders.Milliseconds(), 10) + " ms\n" + "Time To retrieve: " + strconv.FormatInt(timeRetrieveFile.Milliseconds(), 10) + " ms\n" +
+				"=================================The end of CID retrieval=================================\n" +
+				"\n" +
+				"\n" +
+				"\n")
+			err = file.Close()
+			if err != nil {
+				panic(fmt.Errorf("could not Close Debug File in IPFSLink:: GetIPFS\nerror:%s", err))
+			}
+		} else {
 
-	file.WriteString("Got all the cids asked\n")
-	if len(cids) > 0 {
-		file.WriteString("\n" +
-			"Nb of Cids: " + strconv.Itoa(len(cids)) + "\n" +
-			"Time To seek: " + strconv.FormatInt(timeSeekroviders.Milliseconds(), 10) + " ms\n" + "Time To retrieve: " + strconv.FormatInt(timeRetrieveFile.Milliseconds(), 10) + " ms\n" +
-			"=================================The end of CID retrieval=================================\n" +
-			"\n" +
-			"\n" +
-			"\n")
-		err = file.Close()
-		if err != nil {
-			panic(fmt.Errorf("could not Close Debug File in IPFSLink:: GetIPFS\nerror:%s", err))
+			file.WriteString("\n" +
+				fmt.Sprintf("Even if no CID Where downloaded, len(cids):%d", len(cids)) +
+				"=================================The end of CID retrieval=================================\n")
 		}
-	} else {
-
-		file.WriteString("\n" +
-			fmt.Sprintf("Even if no CID Where downloaded, len(cids):%d", len(cids)) +
-			"=================================The end of CID retrieval=================================\n")
 	}
 
 	return out, timeSeekroviders, timeRetrieveFile, nil
