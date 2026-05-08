@@ -421,6 +421,8 @@ func (self *CRDTManager) returnSema() {
 func (self *CRDTManager) UpdateRootNodeFolder() {
 	// Get the semaphore "Permission" to modify the Root Node FOlder (In case another files wants so)
 	self.getSema()
+	// This partially is a slow down point.
+	// We need it for convergence, but this might be optimisable
 	if true {
 		files, err := ioutil.ReadDir(self.Nodes_storage_enplacement + "/rootNode/")
 		t := time.Now()
@@ -808,5 +810,3 @@ func (self *CRDTManager) ToString() string {
 	str += "}\n"
 	return str
 }
-
-//TODO : Specify that CID must not be Clear but encoded, so it can be well decrypted by others. ( the only good construction method of Node i Found)

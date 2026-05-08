@@ -271,7 +271,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]s
 			thisCRDTDag.modified = thisCRDTDag.modified || modif
 		}
 	}
-	return fils, make([]([]byte), 0) //TODO resend not planned CIDs
+	return fils, make([]([]byte), 0)
 }
 
 func (thisCRDTDag *CRDTCLSetStateBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTCLSetStateBasedDagNode) {
@@ -465,7 +465,7 @@ func Create_CRDTCLSetStateBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConf
 		// // fmt.Println("encodedCid Increment :", c.String())
 		// var pl1 CRDTDag.CRDTDagNodeInterface = &newNode
 
-		// crdtSet.dag.AddNode(encodedCid, &pl1) // TODOSetCrdt Complete Node interface
+		// crdtSet.dag.AddNode(encodedCid, &pl1) // SetCrdt Complete Node interface
 
 	}
 	var pl CRDTDag.CRDTDag = &crdtSet
@@ -650,7 +650,7 @@ func (thisCRDTDag *CRDTCLSetStateBasedDag) add_cids(to_add []([]byte), computeti
 		bytes_encoded = append(bytes_encoded, CRDTDag.EncodedStr{Str: bytesread})
 	}
 
-	filesWritten, _ := thisCRDTDag.Merge(bytes_encoded) //TODO receive not planned CIDs
+	filesWritten, _ := thisCRDTDag.Merge(bytes_encoded)
 
 	for index, bytesread := range to_add {
 		s := cid.Cid{}

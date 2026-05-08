@@ -262,6 +262,7 @@ const PORT = 0
 func updateConfigMachineUsage(cfg *config.Config) {
 
 	// FOR now Removing the config update so we have default IPFS
+	// Turn this true to change the IPFS configs
 	if false {
 
 		//Increase limit size to send to peers
