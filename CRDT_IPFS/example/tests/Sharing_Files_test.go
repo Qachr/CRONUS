@@ -60,7 +60,6 @@ package tests
 
 // 		getSema(sema, context.Background())
 
-// 		//TODO : send a random file
 // 		randomData := create_randomdata(100)
 
 // 		t := time.Now()

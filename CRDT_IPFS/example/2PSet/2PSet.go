@@ -519,7 +519,7 @@ func Create_CRDTSetOpBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConfig) C
 		// fmt.Println("encodedCid Increment :", c.String())
 		var pl1 CRDTDag.CRDTDagNodeInterface = &newNode
 
-		crdtSet.dag.AddNode(encodedCid, &pl1)
+		crdtSet.dag.AddNode(encodedCid, &pl1) 
 
 	}
 	var pl CRDTDag.CRDTDag = &crdtSet
@@ -748,7 +748,7 @@ func (self *CRDTSetOpBasedDag) CheckUpdate(sema *semaphore.Weighted) []TimeTuple
 		// apply the update on the peer's data
 		if len(to_add) > 0 {
 			time_get_Sema := time.Now()
-			getSema(sema, self.GetSys().Ctx)
+			getSema(sema, self.GetSys().Ctx) 
 			time_getsema = time_getsema + int(time.Since(time_get_Sema).Nanoseconds())
 			ti := time.Now()
 			time_self_addCIDs := time.Now()
@@ -766,7 +766,7 @@ func (self *CRDTSetOpBasedDag) CheckUpdate(sema *semaphore.Weighted) []TimeTuple
 			for x := range received {
 				received[x].CalculTime = received[x].CalculTime + int(additionnalCompute)
 			}
-
+		
 		}
 
 	}

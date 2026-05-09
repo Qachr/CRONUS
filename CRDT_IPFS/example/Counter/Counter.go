@@ -206,7 +206,6 @@ package Counter
 // 	return &self.dag
 // }
 // func (self *CRDTCounterOpBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
-// 	//TODO Manage concurrency
 // 	for _, cid := range cids {
 // 		find := false
 // 		for x := range self.dag.GetAllNodes() {
@@ -216,7 +215,6 @@ package Counter
 // 			}
 // 		}
 // 		if !find {
-// 			// TODO HERE !!
 // 			// fils, err := self.dag.GetNodeFromEncodedCid(append(make([]CRDTDag.EncodedStr, 0), cid))
 // 			// if err != nil {
 // 			// 	panic(fmt.Errorf("could not retrieve the node %s , error :%s", cid.Str, err))
@@ -266,7 +264,7 @@ package Counter
 // 	// fmt.Println("encodedCid Increment :", c.String())
 // 	var pl CRDTDag.CRDTDagNodeInterface = &newNode
 
-// 	self.dag.AddNode(encodedCid, &pl) // TODOCounterCrdt Complete Node interface
+// 	self.dag.AddNode(encodedCid, &pl) 
 
 // 	self.SendRemoteUpdates()
 

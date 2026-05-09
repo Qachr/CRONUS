@@ -615,7 +615,7 @@ package LogootOpBased
 // 		var pl1 CRDTDag.CRDTDagNodeInterface = &newNode
 
 // 		fmt.Printf("10\n")
-// 		crdtSet.dag.AddNode(encodedCid, &pl1) // TODOSetCrdt Complete Node interface
+// 		crdtSet.dag.AddNode(encodedCid, &pl1) 
 // 		crdtSet.Data = crdtSet.Lookup()
 
 // 	}
