@@ -13,6 +13,7 @@ type CRONUSConfig struct {
 	TotalNbUpdate    int
 	WaitTime         int
 	SyncTime         int
+	DelayTime        int
 	Updating         bool
 	Measurement      bool
 	NtpServ          string
@@ -22,6 +23,8 @@ type CRONUSConfig struct {
 	SwarmKey         bool
 	ParallelRetrieve bool
 	TestMode         bool
+	RROptimisation   bool
+	BPOptimisation   bool
 }
 
 func ToFile(cfg CRONUSConfig, file string) {

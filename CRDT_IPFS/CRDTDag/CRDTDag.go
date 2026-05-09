@@ -20,9 +20,8 @@ import (
 
 	IpfsLink "IPFS_CRDT/ipfsLink"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	Files "github.com/ipfs/go-libipfs/files"
-	"github.com/ipfs/interface-go-ipfs-core/path"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"golang.org/x/sync/semaphore"
@@ -91,14 +90,32 @@ func decrypt(keyString string, stringToDecrypt string) string {
 	return fmt.Sprintf("%s", ciphertext)
 }
 
-///==============================================================
-/// CRDTDag definitions
-///==============================================================
+// /==============================================================
+// / CRDTDag definitions
+// /==============================================================
+type TimingMeasure struct {
+	TimeReadinMerge      int
+	TimeGetinMerge       int
+	ForloopinMerge       int
+	TimeCreateDAGNODE    int
+	TimeFromFile         int
+	TimeremoteAddNodefor int
+
+	Timings TimingMeasure2
+}
+
+type TimingMeasure2 struct {
+	CheckDependency      int
+	GetNodeFromEncoded   int
+	CreateNodeFromFile   int
+	TimeAddNodeInCRDTDAG int
+}
 
 type CRDTDag interface {
 	Lookup_ToSpecifyType() *CRDT.CRDT
 	SendRemoteUpdates()
-	Merge(cid []EncodedStr) []string
+	// Merge(cid []EncodedStr) ([]string, []([]byte), TimingMeasure)
+	Merge(cid []EncodedStr) ([]string, []([]byte))
 	GetSys() *IPFSLink.IpfsLink
 	GetCRDTManager() *CRDTManager
 }
@@ -175,7 +192,7 @@ func (self *CRDTManager) GetAllNodes() [][]byte {
 func (self *CRDTManager) GetAllNodesInterface() []*CRDTDagNodeInterface {
 	return self.nodesInterface
 }
-func (self CRDTManager) EncodeCid(s path.Resolved) EncodedStr {
+func (self CRDTManager) EncodeCid(s blocks.Block) EncodedStr {
 	b, err := json.Marshal(s.Cid())
 	if err != nil {
 		panic(fmt.Errorf("Couldn't marshall the path, byte :\nerror : %s", err))
@@ -185,7 +202,6 @@ func (self CRDTManager) EncodeCid(s path.Resolved) EncodedStr {
 }
 
 func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string, error) {
-	ti := time.Now()
 	Cids := make([]cid.Cid, len(stringIn))
 
 	for index, s := range stringIn {
@@ -197,59 +213,50 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 		Cids[index] = cid
 	}
 
-	fils, err := IPFSLink.GetIPFS(self.Sys, Cids)
+	fils, timeSeekroviders, timeRetrieveFile, err := IPFSLink.GetIPFS(self.Sys, Cids)
 	if err != nil {
 		panic(fmt.Errorf("issue retrieving the IPFS Node :%s", err))
 	}
 	filees_ret := make([]string, 0)
+	timeseek := 0
 	timeDownload := 0
 	if len(fils) > 0 {
-		timeDownload = int(time.Since(ti).Nanoseconds()) / len(fils)
+		timeseek = int(timeSeekroviders.Nanoseconds()) / len(fils)
+		timeDownload = int(timeRetrieveFile.Nanoseconds()) / len(fils)
 	}
-	for _, fil := range fils {
+	for _, block := range fils {
 		ti := time.Now()
 		fstr := self.nextFileName2()
+		filees_ret = append(filees_ret, fstr)
 		_ = os.Remove(fstr) // In cas the file where already existing ( which should never be the case)
 
-		filees_ret = append(filees_ret, fstr)
-
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		Files.WriteTo(fil, fstr)
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!! (botleneck for mispelling)25
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-		// THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!  THIS IS THE BOTTLENECK DIscuss about it !!!!!
-
-		time_Retrieve := timeDownload + int(time.Since(ti).Nanoseconds())
 		// If data has been encoded, We decode it here : \/
 		ti = time.Now()
 		if self.Key != "" {
-			dataEncoded, err := os.ReadFile(fstr)
-			if err != nil {
-				panic(fmt.Errorf("error, could not read data to decrypt it\nError: %s", err))
-			}
+			dataEncoded := block.RawData()
+
 			dataClear := decrypt(self.Key, string(dataEncoded))
 
-			os.Remove(fstr)
-			if _, err := os.Stat(fstr); !errors.Is(err, os.ErrNotExist) {
-				os.Remove(fstr)
-			}
 			fil, err := os.OpenFile(fstr, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the sub file to write encoded data\nError: %s", err))
 			}
 			_, err = fil.Write([]byte(dataClear))
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the sub file to write encoded data\nError: %s", err))
+			}
+			err = fil.Close()
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the sub file to write encoded data \nError: %s", err))
+			}
+		} else {
+			// If data has not been encoded, We Write it directly : \/
+
+			fil, err := os.OpenFile(fstr, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the sub file to write encoded data\nError: %s", err))
+			}
+			_, err = fil.Write(block.RawData())
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the sub file to write encoded data\nError: %s", err))
 			}
@@ -270,7 +277,7 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
 			}
-			_, err = fil.Write([]byte(strconv.Itoa(time_Retrieve)))
+			_, err = fil.Write([]byte(strconv.Itoa(timeDownload)))
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
 			}
@@ -278,6 +285,24 @@ func (self *CRDTManager) GetNodeFromEncodedCid(stringIn []EncodedStr) ([]string,
 			if err != nil {
 				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
 			}
+
+			fstrBis = fstr + ".timeSeek"
+			if _, err := os.Stat(fstrBis); !errors.Is(err, os.ErrNotExist) {
+				os.Remove(fstrBis)
+			}
+			fil, err = os.OpenFile(fstrBis, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
+			}
+			_, err = fil.Write([]byte(strconv.Itoa(timeseek)))
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
+			}
+			err = fil.Close()
+			if err != nil {
+				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
+			}
+
 			if self.Key != "" {
 				fstrBis = fstr + ".timeDecrypt"
 				if _, err := os.Stat(fstrBis); !errors.Is(err, os.ErrNotExist) {
@@ -396,87 +421,91 @@ func (self *CRDTManager) returnSema() {
 func (self *CRDTManager) UpdateRootNodeFolder() {
 	// Get the semaphore "Permission" to modify the Root Node FOlder (In case another files wants so)
 	self.getSema()
-	files, err := ioutil.ReadDir(self.Nodes_storage_enplacement + "/rootNode/")
-	t := time.Now()
-	for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
-		time.Sleep(time.Millisecond)
-		files, err = ioutil.ReadDir(self.Nodes_storage_enplacement + "/rootNode/")
-	}
-	if err != nil {
-		panic(fmt.Errorf("UpdateRootNodeFolder could not open folder\nError: %s", err))
-	}
+	// This partially is a slow down point.
+	// We need it for convergence, but this might be optimisable
+	if true {
+		files, err := ioutil.ReadDir(self.Nodes_storage_enplacement + "/rootNode/")
+		t := time.Now()
+		for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
+			time.Sleep(time.Millisecond)
+			files, err = ioutil.ReadDir(self.Nodes_storage_enplacement + "/rootNode/")
+		}
+		if err != nil {
+			panic(fmt.Errorf("UpdateRootNodeFolder could not open folder\nError: %s", err))
+		}
 
-	for _, file := range files {
-		if file.Size() > 0 {
-			fil, err := os.Open(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
-			t = time.Now()
-			for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
-				time.Sleep(time.Millisecond)
-				fil, err = os.Open(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
-			}
-			if err != nil {
-				panic(fmt.Errorf("UPDATE - 1 could Not Open RootNode %s to update rootnodefolder\nerror: %s", file.Name(), err))
-			}
-			stat, err := fil.Stat()
-			t = time.Now()
-			for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
-				time.Sleep(time.Millisecond)
-				stat, err = fil.Stat()
-			}
-			if err != nil {
-				panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not get stat the sub file\nError: %s", err))
-			}
-			bytesread := make([]byte, stat.Size())
-			_, err = fil.Read(bytesread)
-			t = time.Now()
-			for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
-				time.Sleep(time.Millisecond)
-				_, err = fil.Read(bytesread)
-			}
-			if err != nil {
-				panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not read the sub file\nError: %s", err))
-			}
-			err = fil.Close()
-			t = time.Now()
-			for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
-				time.Sleep(time.Millisecond)
-				err = fil.Close()
-			}
-			if err != nil {
-				panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not close the sub file\nError: %s", err))
-			}
-			if self.IsKnown(bytesread) {
-				err = os.Remove(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
-
+		for _, file := range files {
+			if file.Size() > 0 {
+				fil, err := os.Open(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
 				t = time.Now()
-				for (err != nil) && (time.Since(t) < 1000*time.Millisecond) {
+				for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
 					time.Sleep(time.Millisecond)
-					err = os.Remove(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
+					fil, err = os.Open(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
 				}
 				if err != nil {
-					panic(fmt.Errorf("UPDATE -error in UpdateRootNodeFolder, Could not remove the known file\nError: %s", err))
+					panic(fmt.Errorf("UPDATE - 1 could Not Open RootNode %s to update rootnodefolder\nerror: %s", file.Name(), err))
+				}
+				stat, err := fil.Stat()
+				t = time.Now()
+				for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
+					time.Sleep(time.Millisecond)
+					stat, err = fil.Stat()
+				}
+				if err != nil {
+					panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not get stat the sub file\nError: %s", err))
+				}
+				bytesread := make([]byte, stat.Size())
+				_, err = fil.Read(bytesread)
+				t = time.Now()
+				for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
+					time.Sleep(time.Millisecond)
+					_, err = fil.Read(bytesread)
+				}
+				if err != nil {
+					panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not read the sub file\nError: %s", err))
+				}
+				err = fil.Close()
+				t = time.Now()
+				for (err != nil) && (time.Since(t) < 500*time.Millisecond) {
+					time.Sleep(time.Millisecond)
+					err = fil.Close()
+				}
+				if err != nil {
+					panic(fmt.Errorf("UPDATE - error in UpdateRootNode, Could not close the sub file\nError: %s", err))
+				}
+				if self.IsKnown(bytesread) {
+					err = os.Remove(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
+
+					t = time.Now()
+					for (err != nil) && (time.Since(t) < 1000*time.Millisecond) {
+						time.Sleep(time.Millisecond)
+						err = os.Remove(self.Nodes_storage_enplacement + "/rootNode/" + file.Name())
+					}
+					if err != nil {
+						panic(fmt.Errorf("UPDATE -error in UpdateRootNodeFolder, Could not remove the known file\nError: %s", err))
+					}
 				}
 			}
 		}
-	}
 
-	for n := range self.Root_nodes {
-		fileName := self.Nodes_storage_enplacement + "/rootNode/" + fmt.Sprintf("root%d", self.nextNodeName)
-		self.nextNodeName += 1
-		fil, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0755)
-		if err != nil {
-			panic(fmt.Errorf("UPDATE - 2 could Not Open RootNode to update rootnodefolder\nerror: %s", err))
+		for n := range self.Root_nodes {
+			fileName := self.Nodes_storage_enplacement + "/rootNode/" + fmt.Sprintf("root%d", self.nextNodeName)
+			self.nextNodeName += 1
+			fil, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				panic(fmt.Errorf("UPDATE - 2 could Not Open RootNode to update rootnodefolder\nerror: %s", err))
+			}
+			_, err = fil.Write(self.Root_nodes[n].Str)
+			if err != nil {
+				panic(fmt.Errorf("could Not write in RootNode to update rootnodefolder\nerror: %s", err))
+			}
+			err = fil.Close()
+			if err != nil {
+				panic(fmt.Errorf("could Not Close RootNode to update rootnodefolder\nerror: %s", err))
+			}
 		}
-		_, err = fil.Write(self.Root_nodes[n].Str)
-		if err != nil {
-			panic(fmt.Errorf("could Not write in RootNode to update rootnodefolder\nerror: %s", err))
-		}
-		err = fil.Close()
-		if err != nil {
-			panic(fmt.Errorf("could Not Close RootNode to update rootnodefolder\nerror: %s", err))
-		}
-	}
 
+	}
 	// Release the Semaphore so others can work
 	self.returnSema()
 }
@@ -521,22 +550,47 @@ func (self *CRDTManager) AddNode(node EncodedStr, d *CRDTDagNodeInterface) {
 	self.AddRoot_node(node, d)
 }
 
-func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNodeInterface) {
+// func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNodeInterface) ([]string, []([]byte), TimingMeasure2) {
 
+func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNodeInterface) ([]string, []([]byte)) {
+	m := make(map[string]struct{})
+	m[string(cID.Str)] = struct{}{} // create the map of already downloaded cids, to avoid downloading multiple time some, map is low size thanks to struct{}, search in map is considered efficient compared to table
+	return self.RemoteAddNodeSuperRec(cID, newnode, m)
+}
+
+// func (self *CRDTManager) RemoteAddNodeSuperRec(cID EncodedStr, newnode *CRDTDagNodeInterface, cidAlreadyDl map[string]struct{}) ([]string, []([]byte), TimingMeasure2) {
+func (self *CRDTManager) RemoteAddNodeSuperRec(cID EncodedStr, newnode *CRDTDagNodeInterface, cidAlreadyDl map[string]struct{}) ([]string, []([]byte)) {
 	toDl := make([]EncodedStr, 0)
-	fmt.Println("=======\nRemote add note\n=======\nPeer:", self.GetSys().Cr.Name, "\nEvent:", (*(*newnode).GetEvent()).ToString(), "\nDirect Dependency:", (*newnode).GetDirect_dependency())
+	addedfiles := make([]string, 0)
+	addedCIDs := make([]([]byte), 0)
+	times := TimingMeasure2{0, 0, 0, 0}
+
+	fmt.Println("=======\nREC Remote add note\n=======\nPeer:", self.GetSys().Cr.Name, "\nEvent:", (*(*newnode).GetEvent()).ToString(), "\nDirect Dependency:", (*newnode).GetDirect_dependency())
+
 	if self.retrieveMode {
 		// newNodeFile := ""
-
+		t := time.Now()
 		for node := range (*newnode).GetDirect_dependency() {
-			if !self.IsKnown((*newnode).GetDirect_dependency()[node].Str) {
+			newcid := (*newnode).GetDirect_dependency()[node].Str
+			if _, exists := cidAlreadyDl[string(newcid)]; !exists && !self.IsKnown(newcid) {
 				toDl = append(toDl, (*newnode).GetDirect_dependency()[node])
+				cidAlreadyDl[string(newcid)] = struct{}{}
 			}
 		}
+		times.CheckDependency = int(time.Since(t).Nanoseconds())
+		t = time.Now()
 
 		fils, err := self.GetNodeFromEncodedCid(toDl)
+		for i := range fils {
+			addedfiles = append(addedfiles, fils[i])
+			addedCIDs = append(addedCIDs, toDl[i].Str)
+		}
+
+		times.GetNodeFromEncoded = int(time.Since(t).Nanoseconds())
 
 		for index := range toDl {
+			t = time.Now()
+
 			fil := fils[index]
 			var nn *CRDTDagNodeInterface = (*newnode).CreateEmptyNode()
 			if err != nil {
@@ -545,9 +599,32 @@ func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNode
 
 			(*nn).FromFile(fil)
 
-			self.RemoteAddNodeSuper(toDl[index], nn)
+			times.CreateNodeFromFile = int(time.Since(t).Nanoseconds())
+
+			// additionnalStr, additionnalcids, times2 := self.RemoteAddNodeSuperRec(toDl[index], nn, cidAlreadyDl)
+
+			additionnalStr, additionnalcids := self.RemoteAddNodeSuperRec(toDl[index], nn, cidAlreadyDl)
+			times2 := TimingMeasure2{}
+			times.CheckDependency = times.CheckDependency + times2.CheckDependency
+
+			times.GetNodeFromEncoded = times.GetNodeFromEncoded + times2.GetNodeFromEncoded
+
+			times.CreateNodeFromFile = times.CreateNodeFromFile + times2.CreateNodeFromFile
+
+			times.TimeAddNodeInCRDTDAG = times.TimeAddNodeInCRDTDAG + times2.TimeAddNodeInCRDTDAG
+
+			for i := range additionnalStr {
+				addedfiles = append(addedfiles, additionnalStr[i])
+				addedCIDs = append(addedCIDs, additionnalcids[i])
+			}
 		}
+
+		t = time.Now()
 		self.AddNode(cID, newnode)
+		times.TimeAddNodeInCRDTDAG = times.TimeAddNodeInCRDTDAG + int(time.Since(t).Nanoseconds())
+		// return addedfiles, addedCIDs, times
+		return addedfiles, addedCIDs
+
 	} else {
 		knowAllDependency := true
 
@@ -617,13 +694,16 @@ func (self *CRDTManager) RemoteAddNodeSuper(cID EncodedStr, newnode *CRDTDagNode
 			self.nodesToAdd_Key = append(self.nodesToAdd_Key, cID)
 			self.nodesToAdd_value = append(self.nodesToAdd_value, newnode)
 		}
+		// return addedfiles, make([]([]byte), 0), TimingMeasure2{}
+		return addedfiles, make([]([]byte), 0)
 
 	}
 
 	self.UpdateRootNodeFolder()
-
+	// return addedfiles, make([]([]byte), 0), TimingMeasure2{}
+	return addedfiles, make([]([]byte), 0)
 }
-func (self *CRDTManager) AddToIPFS(ipfs *IpfsLink.IpfsLink, message []byte, args ...*int) (path.Resolved, error) {
+func (self *CRDTManager) AddToIPFS(ipfs *IpfsLink.IpfsLink, message []byte, args ...*int) (blocks.Block, error) {
 	ti := time.Now()
 	if self.Key != "" {
 		message = []byte(encrypt(self.Key, string(message)))
@@ -642,13 +722,13 @@ func (self *CRDTManager) AddToIPFS(ipfs *IpfsLink.IpfsLink, message []byte, args
 func (self *CRDTManager) SendRemoteUpdates() {
 
 	// Lock the data so we can read it with no modification
-	self.getSema()
+	// self.getSema()
 	x := make([]([]byte), len(self.Root_nodes))
 	for i := range self.Root_nodes {
 		x[i] = self.Root_nodes[i].Str
 	}
 
-	self.returnSema()
+	// self.returnSema()
 
 	// Publish with IPFS the state we read after releasing the semaphore,
 	// Like so we the rest of the algorithm isn't locked for a long time (time to send)
@@ -730,5 +810,3 @@ func (self *CRDTManager) ToString() string {
 	str += "}\n"
 	return str
 }
-
-//TODO : Specify that CID must not be Clear but encoded, so it can be well decrypted by others. ( the only good construction method of Node i Found)

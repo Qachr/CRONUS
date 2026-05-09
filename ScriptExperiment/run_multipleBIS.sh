@@ -45,17 +45,17 @@ echo "RunCI"
 echo "Every peers has been started, starting iftop"
 
 sleeptime=$(( $NumberUpdates ))
-margintime=$(( 200 ))
+margintime=$(( 600 )) # 3600 ))
 
 for SLAVE in $SLAVES
 do
     scp get_network_csv.sh root@$SLAVE:~/get_network_csv.sh
-    ssh root@$SLAVE "sh -c './get_network_csv.sh $(($sleeptime + $margintime *3 / 4 )) ${SLAVE}.netlog' " 2>&1 > /dev/null &
+#    ssh root@$SLAVE "sh -c './get_network_csv.sh $(($sleeptime + $margintime *3 / 4 )) ${SLAVE}.netlog' " 2>&1 > /dev/null &
     #ssh root@$SLAVE "sh -c 'iftop -t -s $(($sleeptime + $margintime / 2 ))  > ${SLAVE}.netlog'" 2>&1 > /dev/null &
     ssh root@$SLAVE "sh -c 'dstat -tcnmdsp 3 > ${SLAVE}.dstat'" 2>&1 > /dev/null &
 done
-scp get_network_csv.sh root@$MASTER:~/get_network_csv.sh
-ssh root@$MASTER "sh -c './get_network_csv.sh $(($sleeptime + $margintime *3 / 4 )) ${MASTER}.netlog' " 2>&1 > /dev/null &
+#scp get_network_csv.sh root@$MASTER:~/get_network_csv.sh
+#ssh root@$MASTER "sh -c './get_network_csv.sh $(($sleeptime + $margintime *3 / 4 )) ${MASTER}.netlog' " 2>&1 > /dev/null &
 #ssh root@$MASTER "sh -c 'iftop -t -s $(($sleeptime + $margintime / 2 ))  > ${MASTER}.netlog'" 2>&1 > /dev/null &
 ssh root@$MASTER "sh -c 'dstat -tcnmdp 3 > ${MASTER}.dstat'" 2>&1 > /dev/null &
 

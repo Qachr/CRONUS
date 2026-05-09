@@ -4,9 +4,9 @@ import (
 	"IPFS_CRDT/Config"
 	"IPFS_CRDT/example/CLSet"
 	IpfsLink "IPFS_CRDT/ipfsLink"
+	"errors"
 
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -48,7 +48,7 @@ func BootstrapStateBasedSetUp(cfg Config.CRONUSConfig) {
 
 	fileRead.WriteString("Taking Sema to write headers ... \n")
 	getSema(sema, sys1.Ctx)
-	file.WriteString("CID,time,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
 	returnSema(sema)
 	fileRead.WriteString("Header just written\n")
 	if err != nil {
@@ -69,8 +69,14 @@ func BootstrapStateBasedSetUp(cfg Config.CRONUSConfig) {
 
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," + strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
+				file.WriteString(strList[j].Cid + "," +
+					t + "," +
+					strconv.Itoa(strList[j].SeekAlone) + "," +
+					strconv.Itoa(strList[j].RetrievalAlone) + "," +
+					strconv.Itoa(strList[j].CalculTime) +
+					",0,0," +
+					strconv.Itoa(strList[j].Time_decrypt) + "," +
+					strconv.Itoa(strList[j].SeekTotal) + "," +
 					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
 					strconv.Itoa(strList[j].FileSize) + "\n")
 				returnSema(sema)
@@ -100,8 +106,11 @@ func BootstrapStateBasedSetUp(cfg Config.CRONUSConfig) {
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
 
-				file.WriteString(strList[j].Cid + "," + t + "," + strconv.Itoa(strList[j].RetrievalAlone) + "," +
+				file.WriteString(strList[j].Cid + "," + t + "," +
+					strconv.Itoa(strList[j].SeekAlone) + "," +
+					strconv.Itoa(strList[j].RetrievalAlone) + "," +
 					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
+					strconv.Itoa(strList[j].SeekTotal) + "," +
 					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
 					strconv.Itoa(strList[j].FileSize) + "\n")
 				returnSema(sema)
@@ -131,7 +140,7 @@ func Peer_NotUpdating(cfg Config.CRONUSConfig) {
 	returnSema(sema)
 
 	file, err := os.OpenFile(cfg.PeerName+"/time/time.csv", os.O_CREATE|os.O_WRONLY, 0755)
-	file.WriteString("CID,time,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
 	if err != nil {
 		panic(fmt.Errorf("error openning file file\nerror : %s", err))
 	}
@@ -147,8 +156,10 @@ func Peer_NotUpdating(cfg Config.CRONUSConfig) {
 			t := strconv.Itoa(GetTime(cfg.NtpServ))
 
 			for j := 0; j < len(strList); j++ {
-				file.WriteString(strList[j].Cid + "," + t + "," + strconv.Itoa(strList[j].RetrievalAlone) + "," +
-					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
+				file.WriteString(strList[j].Cid + "," + t + "," +
+					strconv.Itoa(strList[j].SeekAlone) + "," +
+					strconv.Itoa(strList[j].RetrievalAlone) + "," +
+					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," + strconv.Itoa(strList[j].SeekTotal) + "," +
 					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
 					strconv.Itoa(strList[j].FileSize) + "\n")
 			}
@@ -186,6 +197,7 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	}
 	time.Sleep(10 * time.Second)
 
+	fmt.Printf("1\n")
 	getSema(sema, sys1.Ctx)
 	SetCrdt1 := CLSet.Create_CRDTCLSetStateBasedDag(sys1, cfg)
 	returnSema(sema)
@@ -193,7 +205,8 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	fileRead, err := os.OpenFile(cfg.PeerName+"/time/FileRead.log", os.O_CREATE|os.O_WRONLY, 0755)
 	fileRead.WriteString("Taking Sema to write headers ... ")
 	getSema(sema, sys1.Ctx)
-	file.WriteString("CID,time,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	file.WriteString("CID,time,time_seek,time_retrieve,time_compute,time_add_IPFS,time_encrypt,time_decrypt,time_seek_total,time_Retreive_Whole_Batch,ArrivalTime,sateSize\n")
+	fmt.Printf("2\n")
 
 	returnSema(sema)
 	fileRead.WriteString("Header just written\n")
@@ -214,8 +227,11 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," + strconv.Itoa(strList[j].RetrievalAlone) + "," +
+				file.WriteString(strList[j].Cid + "," + t + "," +
+					strconv.Itoa(strList[j].SeekAlone) + "," +
+					strconv.Itoa(strList[j].RetrievalAlone) + "," +
 					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
+					strconv.Itoa(strList[j].SeekTotal) + "," +
 					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
 					strconv.Itoa(strList[j].FileSize) + "\n")
 
@@ -225,6 +241,7 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 			fileRead.WriteString("all update received are handled\n= = = = = = =\n")
 		}
 	}
+	fmt.Printf("3\n")
 
 	// Send updates concurrently every 1 seconds
 	go doUpdates(cfg.UpdatesNB, SetCrdt1, cfg.NtpServ, file, sys1.Cr.Id, sema)
@@ -235,6 +252,8 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 	ti = time.Now()
 	k := 0
 	for k < cfg.UpdatesNB {
+		fmt.Printf("4\n")
+
 		time.Sleep(time.Duration(cfg.WaitTime) * time.Microsecond)
 
 		strList := SetCrdt1.CheckUpdate(sema)
@@ -243,8 +262,11 @@ func Peer_Updating(cfg Config.CRONUSConfig) {
 			t := strconv.Itoa(GetTime(cfg.NtpServ))
 			for j := 0; j < len(strList); j++ {
 				getSema(sema, sys1.Ctx)
-				file.WriteString(strList[j].Cid + "," + t + "," + strconv.Itoa(strList[j].RetrievalAlone) + "," +
+				file.WriteString(strList[j].Cid + "," + t + "," +
+					strconv.Itoa(strList[j].SeekAlone) + "," +
+					strconv.Itoa(strList[j].RetrievalAlone) + "," +
 					strconv.Itoa(strList[j].CalculTime) + ",0,0," + strconv.Itoa(strList[j].Time_decrypt) + "," +
+					strconv.Itoa(strList[j].SeekTotal) + "," +
 					strconv.Itoa(strList[j].RetrievalTotal) + "," + strconv.Itoa(strList[j].ArrivalTime) + "," +
 					strconv.Itoa(strList[j].FileSize) + "\n")
 
@@ -279,6 +301,8 @@ func doUpdates(nbUpdates int, SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ st
 }
 
 func SendState(SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ string, file *os.File, netID string, sema *semaphore.Weighted, cfg Config.CRONUSConfig) {
+	first := false
+	time_first := time.Now()
 	fileWrite, _ := os.OpenFile(SetCrdt1.GetCRDTManager().Nodes_storage_enplacement+"/time/FileWrite.log", os.O_CREATE|os.O_WRONLY, 0755)
 	fileWrite.WriteString(fmt.Sprintf("starting the Set, Sending my state every %d s\n", cfg.SyncTime))
 	ti := time.Now()
@@ -290,19 +314,22 @@ func SendState(SetCrdt1 *CLSet.CRDTCLSetStateBasedDag, ntpServ string, file *os.
 	for {
 		time.Sleep(100 * time.Microsecond)
 
-		if time.Since(ti) >= time.Second*time.Duration(cfg.SyncTime) {
+		if time.Since(ti) >= time.Second*time.Duration(cfg.SyncTime) && time.Since(time_first) <= 600*time.Second {
 			getSema(sema, context.Background())
 			fileWrite.WriteString("updating the data\n")
 			encodedCid, times := SetCrdt1.SendState()
+			if first == false {
+				first = true
+				time_first = time.Now()
+			}
 			fileWrite.WriteString("updating the data - taking sema\n")
 			fileWrite.WriteString("Semaphore tooken\n")
-			file.WriteString(encodedCid + "," + strconv.Itoa(GetTime(ntpServ)) + "," + "0,0," + strconv.Itoa(times.Time_add) + "," + strconv.Itoa(times.Time_encrypt) + ",0,0,0," + strconv.Itoa(times.FileSize) + "\n")
+			file.WriteString(encodedCid + "," + strconv.Itoa(GetTime(ntpServ)) + "," + "0,0,0," + strconv.Itoa(times.Time_add) + "," + strconv.Itoa(times.Time_encrypt) + ",0,0,0,0," + strconv.Itoa(times.FileSize) + "\n")
 			fileWrite.WriteString("returning Semaphore\n")
 			fileWrite.WriteString("WRITE - 1 line added to time.csv\n")
 			returnSema(sema)
 			k++
 			ti = time.Now()
 		}
-
 	}
 }

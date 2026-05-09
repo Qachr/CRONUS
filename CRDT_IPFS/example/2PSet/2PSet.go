@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/interface-go-ipfs-core/path"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -222,8 +222,12 @@ func (self *CRDTSetOpBasedDag) IsKnown(cid CRDTDag.EncodedStr) bool {
 	}
 	return find
 }
-func (self *CRDTSetOpBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
 
+// CRDTDag.TimingMeasure
+// func (self *CRDTSetOpBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]string, []([]byte), CRDTDag.TimingMeasure) {
+func (self *CRDTSetOpBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]string, []([]byte)) {
+	times := CRDTDag.TimingMeasure{0, 0, 0, 0, 0, 0, CRDTDag.TimingMeasure2{0, 0, 0, 0}}
+	timeReadCIDs := time.Now()
 	to_add := make([]CRDTDag.EncodedStr, 0)
 	for _, cid := range cids {
 		find := self.IsKnown(cid)
@@ -231,64 +235,116 @@ func (self *CRDTSetOpBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
 			to_add = append(to_add, cid)
 		}
 	}
+	times.TimeReadinMerge = (int(time.Since(timeReadCIDs).Nanoseconds()))
 
+	Time_GetinMerge := time.Now()
 	fils, err := self.dag.GetNodeFromEncodedCid(to_add)
 	if err != nil {
 		panic(fmt.Errorf("could not get ndoes from encoded cids\nerror :%s", err))
 	}
+	times.TimeGetinMerge = (int(time.Since(Time_GetinMerge).Nanoseconds()))
 
+	Time_remoteaddMerge := time.Now()
+
+	receivedFiles := make([]string, 0)
+	receivedCids := make([]([]byte), 0)
+
+	for i, f := range fils {
+		receivedFiles = append(receivedFiles, f)
+		receivedCids = append(receivedCids, to_add[i].Str)
+	}
+	times.TimeCreateDAGNODE = 0
+	times.TimeFromFile = 0
+	times.TimeremoteAddNodefor = 0
 	for index := range fils {
+		timeMeasured := time.Now()
 		fil := fils[index]
 		n := CreateDagNode(Operation{}, "") // Create an Empty operation
-		n.FromFile(fil)                     // Fill it with the operation just read
-		self.remoteAddNode(cids[index], n)  // Add the data as a Remote operation (which are applied as a local one)
+
+		//Measure 1
+		times.TimeCreateDAGNODE = times.TimeCreateDAGNODE + (int(time.Since(timeMeasured).Nanoseconds()))
+		timeMeasured = time.Now()
+
+		n.FromFile(fil) // Fill it with the operation just read
+
+		//Measure 2
+		times.TimeFromFile = times.TimeFromFile + (int(time.Since(timeMeasured).Nanoseconds()))
+		timeMeasured = time.Now()
+
+		// addi_file, addi_CID, times2 := self.remoteAddNode(cids[index], n) // Add the data as a Remote operation (which are applied as a local one)
+
+		addi_file, addi_CID := self.remoteAddNode(cids[index], n)
+		times2 := CRDTDag.TimingMeasure2{}
+
+		times.Timings.CheckDependency = times.Timings.CheckDependency + times2.CheckDependency
+
+		times.Timings.CreateNodeFromFile = times.Timings.CreateNodeFromFile + times2.CreateNodeFromFile
+
+		times.Timings.GetNodeFromEncoded = times.Timings.GetNodeFromEncoded + times2.GetNodeFromEncoded
+
+		times.Timings.TimeAddNodeInCRDTDAG = times.Timings.TimeAddNodeInCRDTDAG + times2.TimeAddNodeInCRDTDAG
+
+		for i := range addi_file {
+			receivedFiles = append(receivedFiles, addi_file[i])
+			receivedCids = append(receivedCids, addi_CID[i])
+		}
+
+		//Measure 3
+		times.TimeremoteAddNodefor = times.TimeremoteAddNodefor + (int(time.Since(timeMeasured).Nanoseconds()))
+		timeMeasured = time.Now()
+
 	}
-	return fils
+	times.ForloopinMerge = (int(time.Since(Time_remoteaddMerge).Nanoseconds()))
+	// return receivedFiles, receivedCids, times
+	return receivedFiles, receivedCids
 }
 
-func (self *CRDTSetOpBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTSetOpBasedDagNode) {
+// Return the additionnal files that have been added as dependency of the CID cID in newnode, if they have been added
+// func (self *CRDTSetOpBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTSetOpBasedDagNode) ([]string, []([]byte), CRDTDag.TimingMeasure2) {
+func (self *CRDTSetOpBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTSetOpBasedDagNode) ([]string, []([]byte)) {
 	var pl CRDTDag.CRDTDagNodeInterface = &newnode
-	self.dag.RemoteAddNodeSuper(cID, &pl)
+	// foundFILES, additionnalCIDs, times2 := self.dag.RemoteAddNodeSuper(cID, &pl)
+	foundFILES, additionnalCIDs := self.dag.RemoteAddNodeSuper(cID, &pl)
+	// return foundFILES, additionnalCIDs, times2
+	return foundFILES, additionnalCIDs
 }
 
-func (self *CRDTSetOpBasedDag) callAddToIPFS(bytes []byte, file string) (path.Resolved, error) {
+func (thisCRDTDag *CRDTSetOpBasedDag) callAddToIPFS(bytes []byte, file string) (blocks.Block, error) {
 	time_toencrypt := -1
 	ti := time.Now()
-	var path path.Resolved
+	var path blocks.Block
 	var err error
-	if self.dag.Key != "" {
-		path, err = self.GetCRDTManager().AddToIPFS(self.dag.Sys, bytes, &time_toencrypt)
-
+	if thisCRDTDag.dag.Key != "" {
+		path, err = thisCRDTDag.GetCRDTManager().AddToIPFS(thisCRDTDag.dag.Sys, bytes, &time_toencrypt)
 	} else {
-		path, err = self.GetCRDTManager().AddToIPFS(self.dag.Sys, bytes)
+		path, err = thisCRDTDag.GetCRDTManager().AddToIPFS(thisCRDTDag.dag.Sys, bytes)
 		time_toencrypt = 0
-
 	}
 	if err != nil {
-		panic(fmt.Errorf("Error in callAddToIPFS, Couldn't add file to IPFS\nError: %s\n", err))
+		panic(fmt.Errorf("error in callAddToIPFS, Couldn't add file to IPFS\nError: %s\n \t", err))
 	}
 	Total_AddTime := int(time.Since(ti).Nanoseconds())
 	time_add := Total_AddTime - time_toencrypt
 
-	if self.measurement {
+	if thisCRDTDag.measurement {
 		// Write time to encrypt in a file
 		fstrBis := ""
-		if self.dag.Key != "" {
+		if thisCRDTDag.dag.Key != "" {
 			fstrBis = file + ".timeEncrypt"
 			if _, err := os.Stat(fstrBis); !errors.Is(err, os.ErrNotExist) {
 				os.Remove(fstrBis)
 			}
 			fil, err := os.OpenFile(fstrBis, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
-				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
+				panic(fmt.Errorf("error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
 			}
 			_, err = fil.Write([]byte(strconv.Itoa(time_toencrypt)))
 			if err != nil {
-				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
+				panic(fmt.Errorf("error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
 			}
 			err = fil.Close()
 			if err != nil {
-				panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
+				panic(fmt.Errorf("error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
 			}
 		}
 
@@ -299,15 +355,15 @@ func (self *CRDTSetOpBasedDag) callAddToIPFS(bytes []byte, file string) (path.Re
 		}
 		fil, err := os.OpenFile(fstrBis, os.O_CREATE|os.O_WRONLY, 0755)
 		if err != nil {
-			panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
+			panic(fmt.Errorf("error RemoteAddNodeSupde - , Could not open the time file to write encoded data\nError: %s", err))
 		}
 		_, err = fil.Write([]byte(strconv.Itoa(time_add)))
 		if err != nil {
-			panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
+			panic(fmt.Errorf("error RemoteAddNodeSupde - , Could not write the time file to write encoded data\nError: %s", err))
 		}
 		err = fil.Close()
 		if err != nil {
-			panic(fmt.Errorf("Error RemoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
+			panic(fmt.Errorf("error remoteAddNodeSupde - , Could not close the time file to write encoded data \nError: %s", err))
 		}
 	}
 
@@ -315,7 +371,7 @@ func (self *CRDTSetOpBasedDag) callAddToIPFS(bytes []byte, file string) (path.Re
 }
 
 func (self *CRDTSetOpBasedDag) Add(x string) (string, TimeTuple) {
-	newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, self.GetSys().IpfsNode.Identity.Pretty())
+	newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, self.GetSys().IpfsNode.Identity.ShortString())
 	for dependency := range self.dag.Root_nodes {
 		// fmt.Println("dep:", self.dag.Root_nodes[dependency].Str)
 		newNode.DagNode.DirectDependency = append(newNode.DagNode.DirectDependency, self.dag.Root_nodes[dependency])
@@ -393,7 +449,7 @@ func (self *CRDTSetOpBasedDag) Add(x string) (string, TimeTuple) {
 }
 func (self *CRDTSetOpBasedDag) Remove(x string) string {
 
-	newNode := CreateDagNode(Operation{Elem: Element(x), Op: REMOVE}, self.GetSys().IpfsNode.Identity.Pretty())
+	newNode := CreateDagNode(Operation{Elem: Element(x), Op: REMOVE}, self.GetSys().IpfsNode.Identity.ShortString())
 	for dependency := range self.dag.Root_nodes {
 		newNode.DagNode.DirectDependency = append(newNode.DagNode.DirectDependency, self.dag.Root_nodes[dependency])
 	}
@@ -437,7 +493,7 @@ func Create_CRDTSetOpBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConfig) C
 		if err != nil {
 			panic(fmt.Errorf("Could not read initial_value, error : %s", err))
 		}
-		newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, crdtSet.GetSys().IpfsNode.Identity.Pretty())
+		newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, crdtSet.GetSys().IpfsNode.Identity.ShortString())
 		strFile := crdtSet.dag.NextFileName()
 
 		if _, err := os.Stat(strFile); !errors.Is(err, os.ErrNotExist) {
@@ -463,7 +519,7 @@ func Create_CRDTSetOpBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConfig) C
 		// fmt.Println("encodedCid Increment :", c.String())
 		var pl1 CRDTDag.CRDTDagNodeInterface = &newNode
 
-		crdtSet.dag.AddNode(encodedCid, &pl1) // TODOSetCrdt Complete Node interface
+		crdtSet.dag.AddNode(encodedCid, &pl1) 
 
 	}
 	var pl CRDTDag.CRDTDag = &crdtSet
@@ -506,16 +562,39 @@ func (self *CRDTSetOpBasedDag) Lookup() CRDTSetOpBased {
 }
 
 type TimeTuple struct {
-	Cid              string
-	RetrievalAlone   int
-	RetrievalTotal   int
-	CalculTime       int
-	Time_add         int
-	Time_encrypt     int
-	Time_decrypt     int
-	ArrivalTime      int
-	TimeLookupFolder int
-	TimeRemoveFiles  int
+	Cid            string
+	RetrievalAlone int
+	SeekAlone      int
+	RetrievalTotal int
+	SeekTotal      int
+	CalculTime     int
+	Time_add       int
+	Time_encrypt   int
+	Time_decrypt   int
+	ArrivalTime    int
+	FileSize       int
+
+	TimeTotal            int
+	TimeFolder           int
+	TimefilesMeasurement int
+
+	TimeselfaddCIDs               int
+	TimeGetSema                   int
+	Timeselfupdaterootdnodefolder int
+
+	TimeMerge int
+
+	TimeReadinMerge      int
+	TimeGetinMerge       int
+	ForloopinMerge       int
+	TimeCreateDAGNODE    int
+	TimeFromFile         int
+	TimeremoteAddNodefor int
+
+	CheckDependency      int
+	GetNodeFromEncoded   int
+	CreateNodeFromFile   int
+	TimeAddNodeInCRDTDAG int
 }
 
 // semaphore usage
@@ -538,11 +617,21 @@ func returnSema(sema *semaphore.Weighted) {
 // Check update function retrieve files from ipfs (long)
 // and then reserves the semaphore to actually modify the data (short)
 func (self *CRDTSetOpBasedDag) CheckUpdate(sema *semaphore.Weighted) []TimeTuple {
+	// Defineing additionnal measurement time :
+	timetotal := time.Now()
+	time_Files_measruement := time.Since(timetotal)
+	time_folder := time.Since(timetotal)
+	timeself_addCIDs := 0
+	timeself_updaterootdnodefolder := 0
+	time_getsema := 0
+
 	received := make([]TimeTuple, 0)
 	files, err := ioutil.ReadDir(self.GetDag().Nodes_storage_enplacement + "/remote")
 	if err != nil {
 		fmt.Printf("CheckUpdate - Checkupdate could not open folder\nerror: %s\n", err)
 	} else {
+		time_Files := time.Now()
+		time_folder = time.Since(timetotal)
 		ti := time.Now()
 		to_add := make([]([]byte), 0)
 		computetime := make([]int64, 0)
@@ -551,7 +640,7 @@ func (self *CRDTSetOpBasedDag) CheckUpdate(sema *semaphore.Weighted) []TimeTuple
 			if file.Size() > 0 && !strings.Contains(file.Name(), ".ArrivalTime") {
 				fil, err := os.OpenFile(self.GetDag().Nodes_storage_enplacement+"/remote/"+file.Name(), os.O_RDONLY, os.ModeAppend)
 				if err != nil {
-					panic(fmt.Errorf("error in checkupdate, Could not open the sub file\nError: %s", err))
+					fmt.Printf("error in checkupdate, Could not open the sub file\nError: %s", err)
 				}
 				stat, err := fil.Stat()
 				if err != nil {
@@ -571,76 +660,127 @@ func (self *CRDTSetOpBasedDag) CheckUpdate(sema *semaphore.Weighted) []TimeTuple
 				if err != nil {
 					panic(fmt.Errorf("error in checkupdate, Could not close the sub file\nError: %s", err))
 				}
+				if !self.IsKnown(CRDTDag.EncodedStr{Str: bytesread}) {
+					to_add = append(to_add, bytesread)
+				}
 				s := cid.Cid{}
 				json.Unmarshal(bytesread, &s)
+
+				err = os.Remove(self.GetDag().Nodes_storage_enplacement + "/remote/" + file.Name())
+				if err != nil && !(errors.Is(err, os.ErrNotExist)) {
+					fmt.Printf("error in checkupdate, Could not remove the sub file\nError: %s", err)
+				}
+
+				// Take the time measurement of this file
+				// Get the time of arrival to compute pubsub time
 
 				// Take the time measurement of this file
 				// Get the time of arrival to compute pubsub time
 				fil, err = os.OpenFile(self.GetDag().Nodes_storage_enplacement+"/remote/"+file.Name()+".ArrivalTime", os.O_RDONLY, os.ModeAppend)
-				exists := true
 				if err != nil {
-					exists = false
-					// panic(fmt.Errorf("error in checkupdate, Could not open the sub file\nError: %s", err))
+					fmt.Printf("error in checkupdate, Could not open the sub file\nError: %s", err)
 				}
+				stat, err = fil.Stat()
 				if err != nil {
-					exists = false
-					// panic(fmt.Errorf("error in checkupdate, Could not get stat the sub file\nError: %s", err))
+					panic(fmt.Errorf("error in checkupdate, Could not get stat the sub file\nError: %s", err))
+				}
+				bytesread = make([]byte, stat.Size())
+				n, err = fil.Read(bytesread)
+				if err != nil {
+					panic(fmt.Errorf("error in checkupdate, Could not read the sub file\nError: %s", err))
 				}
 
-				if exists {
-					stat, err = fil.Stat()
-					if stat.Size() == 0 {
-						exists = false // panic(fmt.Errorf("error in checkupdate, Could not get stat the sub file\nError: File is empty, this isn't normal\n"))
-
-					}
+				// filez.WriteString("5\n")
+				fmt.Println("stat.size :", stat.Size(), "read :", n)
+				if int64(n) != stat.Size() {
+					panic(fmt.Errorf("error in checkupdate, Could not read entirely the sub file\nError: read %d byte unstead of %d", n, stat.Size()))
 				}
-				if exists {
-					if !self.IsKnown(CRDTDag.EncodedStr{Str: bytesread}) {
-						to_add = append(to_add, bytesread)
-					}
-					err = os.Remove(self.GetDag().Nodes_storage_enplacement + "/remote/" + file.Name())
-					if err != nil || errors.Is(err, os.ErrNotExist) {
-						panic(fmt.Errorf("error in checkupdate, Could not remove the sub file\nError: %s", err))
-					}
-
-					bytesread = make([]byte, stat.Size())
-					n, err = fil.Read(bytesread)
-					if err != nil {
-						panic(fmt.Errorf("error in checkupdate, Could not read the sub file\nError: %s", err))
-					}
-
-					// fmt.Println("stat.size :", stat.Size(), "read :", n)
-					if int64(n) != stat.Size() {
-						panic(fmt.Errorf("error in checkupdate, Could not read entirely the sub file\nError: read %d byte unstead of %d", n, stat.Size()))
-					}
-					err = fil.Close()
-					if err != nil {
-						panic(fmt.Errorf("error in checkupdate, Could not close the sub file\nError: %s", err))
-					}
-					time_of_arrival, _ := strconv.Atoi(string(bytesread))
-					arrivalTime = append(arrivalTime, int64(time_of_arrival))
-
-					//computation time, time to manage this file
-					timeToCompute := time.Since(ti).Nanoseconds()
-					computetime = append(computetime, timeToCompute)
-					ti = time.Now()
-				} else {
-					fmt.Printf("File doesn't exists yet, ignoring and waiting")
+				err = fil.Close()
+				if err != nil {
+					panic(fmt.Errorf("error in checkupdate, Could not close the sub file\nError: %s", err))
 				}
+				time_of_arrival, _ := strconv.Atoi(string(bytesread))
+				arrivalTime = append(arrivalTime, int64(time_of_arrival))
+
+				// filez.WriteString("6\n")
+				//computation time, time to manage this file
+				timeToCompute := time.Since(ti).Nanoseconds()
+				computetime = append(computetime, timeToCompute)
+				ti = time.Now()
+
+				// 	}
+				// 	if exists {
+				// 		if !self.IsKnown(CRDTDag.EncodedStr{Str: bytesread}) {
+				// 			to_add = append(to_add, bytesread)
+				// 		}
+				// 		err = os.Remove(self.GetDag().Nodes_storage_enplacement + "/remote/" + file.Name())
+				// 		if err != nil || errors.Is(err, os.ErrNotExist) {
+				// 			panic(fmt.Errorf("error in checkupdate, Could not remove the sub file\nError: %s", err))
+				// 		}
+
+				// 		bytesread = make([]byte, stat.Size())
+				// 		n, err = fil.Read(bytesread)
+				// 		if err != nil {
+				// 			panic(fmt.Errorf("error in checkupdate, Could not read the sub file\nError: %s", err))
+				// 		}
+
+				// 		// fmt.Println("stat.size :", stat.Size(), "read :", n)
+				// 		if int64(n) != stat.Size() {
+				// 			panic(fmt.Errorf("error in checkupdate, Couldreceived not read entirely the sub file\nError: read %d byte unstead of %d", n, stat.Size()))
+				// 		}
+				// 		time_of_arrival, _ := strconv.Atoi(string(bytesread))
+				// 		arrivalTime = append(arrivalTime, int64(time_of_arrival))
+
+				// 		//computation time, time to manage this file
+				// 		timeToCompute := time.Since(ti).Nanoseconds()
+				// 		computetime = append(computetime, timeToCompute)
+				// 		ti = time.Now()
+				// 	} else {
+				// 		fmt.Printf("File doesn't exists yet, ignoring and waiting")
+				// 	}add_cids
+				// }
 			} else {
 				fmt.Printf("Remote folder contain a FILE of a NULL SIZE\n")
 			}
 		}
-
+		time_Files_measruement = time.Since(time_Files)
+		// Not measured bellow (add_cids measure itself, but we dont measure outside here the semaphore)
 		// apply the update on the peer's data
 		if len(to_add) > 0 {
-			getSema(sema, self.GetSys().Ctx)
+			time_get_Sema := time.Now()
+			getSema(sema, self.GetSys().Ctx) 
+			time_getsema = time_getsema + int(time.Since(time_get_Sema).Nanoseconds())
+			ti := time.Now()
+			time_self_addCIDs := time.Now()
 			received = self.add_cids(to_add, computetime, arrivalTime, ti)
+			timeself_addCIDs = timeself_addCIDs + int(time.Since(time_self_addCIDs).Nanoseconds())
+
+			time_self_updaterootnodefolder := time.Now()
+			//This is the important line
 			self.GetDag().UpdateRootNodeFolder()
+			timeself_updaterootdnodefolder = timeself_updaterootdnodefolder + int(time.Since(time_self_updaterootnodefolder).Nanoseconds())
+
 			returnSema(sema)
+
+			additionnalCompute := time.Since(ti).Nanoseconds()
+			for x := range received {
+				received[x].CalculTime = received[x].CalculTime + int(additionnalCompute)
+			}
+		
 		}
 
 	}
+
+	t_total := time.Since(timetotal)
+	for x := range received {
+		received[x].TimeTotal = int(t_total.Nanoseconds())
+		received[x].TimeFolder = int(time_folder.Nanoseconds())
+		received[x].TimefilesMeasurement = int(time_Files_measruement.Nanoseconds())
+		received[x].TimeselfaddCIDs = timeself_addCIDs
+		received[x].Timeselfupdaterootdnodefolder = timeself_updaterootdnodefolder
+		received[x].TimeGetSema = time_getsema
+	}
+
 	return received
 }
 
@@ -710,14 +850,14 @@ func (self *CRDTSetOpBasedDag) CheckUpdate_20Version(sema *semaphore.Weighted) [
 					willBeAdded = append(willBeAdded, bytesread)
 
 				}
-				if cpt >= 20 {
+				if cpt >= 40 {
 					break
 				}
 			}
 		}
 
 		fileRead.WriteString(fmt.Sprintf("after reading files, cpt value is %d\n", cpt))
-		if cpt >= 20 {
+		if cpt >= 40 {
 			time_lookup_folder := time.Since(timelookup)
 			time_remove_files := time.Since(time.Now()) // init at 0
 			fileRead.WriteString(fmt.Sprintf("Time Lookup Folder : %d, time Since %d \n", time_lookup_folder, time.Since(timelookup)))
@@ -792,7 +932,7 @@ func (self *CRDTSetOpBasedDag) CheckUpdate_20Version(sema *semaphore.Weighted) [
 					computetime = append(computetime, timeToCompute)
 					ti = time.Now()
 
-					if cpt >= 20 {
+					if cpt >= 40 {
 						break
 					}
 
@@ -811,10 +951,10 @@ func (self *CRDTSetOpBasedDag) CheckUpdate_20Version(sema *semaphore.Weighted) [
 
 			returnSema(sema)
 
-			for i := range received {
-				received[i].TimeLookupFolder = int(time_lookup_folder.Nanoseconds())
-				received[i].TimeRemoveFiles = int(time_remove_files.Nanoseconds())
-			}
+			// for i := range received {
+			// 	received[i].TimeLookupFolder = int(time_lookup_folder.Nanoseconds())
+			// 	received[i].TimeRemoveFiles = int(time_remove_files.Nanoseconds())
+			// }
 
 			fileRead.WriteString(fmt.Sprintf("Time Remove files from Folder : %d _ value writen : %d \n", time_remove_files, int(time_remove_files.Nanoseconds())))
 			fileRead.WriteString(fmt.Sprintf("Repeat time Lookup Folder : %d, time written : %d \n", time_lookup_folder, int(time_remove_files.Nanoseconds())))
@@ -833,51 +973,123 @@ func (self *CRDTSetOpBasedDag) add_cids(to_add []([]byte), computetime []int64, 
 	for _, bytesread := range to_add {
 		bytes_encoded = append(bytes_encoded, CRDTDag.EncodedStr{Str: bytesread})
 	}
+	timeMerge := time.Now()
+	// , times
+	// filesWritten, cidReceived, times := self.Merge(bytes_encoded)
+	filesWritten, cidReceived := self.Merge(bytes_encoded)
+	timeSinceMerge := time.Since(timeMerge)
 
-	filesWritten := self.Merge(bytes_encoded)
+	bytes_cids := make([]CRDTDag.EncodedStr, 0)
 
-	for index, bytesread := range to_add {
+	for _, bytesread := range cidReceived {
+		bytes_cids = append(bytes_cids, CRDTDag.EncodedStr{Str: bytesread})
+	}
+
+	for index, bytesread := range cidReceived {
+		correspondingFile := filesWritten[index]
 		s := cid.Cid{}
 		json.Unmarshal(bytesread, &s)
 		timeRetrieve := 0
+		timeSeek := 0
 		timeDecrypt := 0
-		if self.measurement && filesWritten[index] != "node1/node1" {
+		fileSize := 0
+		if self.measurement && correspondingFile != "node1/node1" {
 			// Get Time of Retrieval
-			str, err := os.ReadFile(filesWritten[index] + ".timeRetrieve")
+			str, err := os.ReadFile(correspondingFile + ".timeRetrieve")
+			fileInfo, _ := os.Stat(correspondingFile)
+			fileSize = int(fileInfo.Size())
 			if err != nil {
-				panic(fmt.Errorf("Set.go - Could not read Time to retrieve measurement\nError: %s", err))
+				panic(fmt.Errorf("set.go - could not read time to retrieve measurement\nerror: %s", err))
 			}
 			timeRetrieve, err = strconv.Atoi(string(str))
 			if err != nil {
-				panic(fmt.Errorf("Set.go - Could not translate Time to retrieve to string, maybe malformerd ?\nError: %s", err))
+				panic(fmt.Errorf("set.go - could not translate time to retrieve to string, maybe malformerd ?\nerror: %s", err))
 			}
 
-			err = os.Remove(filesWritten[index] + ".timeRetrieve")
+			err = os.Remove(correspondingFile + ".timeRetrieve")
 			if err != nil {
-				panic(fmt.Errorf("Set.go - Could not remove Time to retrieve file\nError: %s", err))
+				panic(fmt.Errorf("set.go - could not remove time to retrieve file\nerror: %s", err))
+			}
+
+			// Get Time of seektime
+			str, err = os.ReadFile(correspondingFile + ".timeSeek")
+			fileInfo, _ = os.Stat(correspondingFile)
+			fileSize = int(fileInfo.Size())
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not read time to retrieve measurement\nerror: %s", err))
+			}
+			timeSeek, err = strconv.Atoi(string(str))
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not translate time to retrieve to string, maybe malformerd ?\nerror: %s", err))
+			}
+
+			err = os.Remove(correspondingFile + ".timeSeek")
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not remove time to retrieve file\nerror: %s", err))
 			}
 
 			//If we use it, get time of decryption of the file
 			if self.dag.Key != "" {
-				str, err = os.ReadFile(filesWritten[index] + ".timeDecrypt")
+				str, err = os.ReadFile(correspondingFile + ".timeDecrypt")
 				if err != nil {
-					panic(fmt.Errorf("Set.go - Could not read Time to decrypt measurement\nError: %s", err))
+					panic(fmt.Errorf("set.go - could not read time decrypt measurement\nerror: %s", err))
 				}
 				timeDecrypt, err = strconv.Atoi(string(str))
 				if err != nil {
-					panic(fmt.Errorf("Set.go - Could not translate Time to retrieve to string, maybe malformerd ?\nError: %s", err))
+					panic(fmt.Errorf("set.go - could not translate time to retrieve to string, maybe malformerd ?\nerror: %s", err))
 				}
-				err = os.Remove(filesWritten[index] + ".timeDecrypt")
+				err = os.Remove(correspondingFile + ".timeDecrypt")
 				if err != nil {
-					panic(fmt.Errorf("Set.go - Could not remove Time to Decrypt file\nError: %s", err))
+					panic(fmt.Errorf("set.go - could not remove time to decrypt file\nerror: %s", err))
 				}
 
 			}
-			// fmt.Println("calling UpdateRootNodeFolder")
-			received = append(received, TimeTuple{Cid: s.String(), RetrievalAlone: timeRetrieve, RetrievalTotal: timeRetrieve * len(to_add), CalculTime: int(computetime[index]), ArrivalTime: int(arrivalTime[index]), Time_decrypt: timeDecrypt, Time_encrypt: 0})
-		}
-	}
 
+		}
+		// fmt.Println("calling UpdateRootNodeFolder")
+		comptime := 0
+		arrtime := 0
+		if index < len(computetime) {
+			comptime = int(computetime[index])
+		} else {
+			comptime = int(computetime[len(computetime)-1])
+
+		}
+
+		if index < len(arrivalTime) {
+			arrtime = int(arrivalTime[index])
+		} else {
+			arrtime = int(arrivalTime[len(arrivalTime)-1])
+
+		}
+
+		received = append(received, TimeTuple{
+			Cid:            s.String(),
+			RetrievalAlone: timeRetrieve,
+			RetrievalTotal: timeRetrieve * len(to_add),
+			SeekAlone:      timeSeek,
+			SeekTotal:      timeSeek * len(to_add),
+			CalculTime:     comptime,
+			ArrivalTime:    arrtime,
+			Time_decrypt:   timeDecrypt,
+			Time_encrypt:   0,
+			FileSize:       fileSize,
+			TimeMerge:      int(timeSinceMerge.Nanoseconds()),
+
+			// TimeReadinMerge:      times.TimeReadinMerge,
+			// TimeGetinMerge:       times.TimeGetinMerge,
+			// ForloopinMerge:       times.ForloopinMerge,
+			// TimeCreateDAGNODE:    times.TimeCreateDAGNODE,
+			// TimeFromFile:         times.TimeFromFile,
+			// TimeremoteAddNodefor: times.TimeremoteAddNodefor,
+
+			// CheckDependency:      times.Timings.CheckDependency,
+			// GetNodeFromEncoded:   times.Timings.GetNodeFromEncoded,
+			// CreateNodeFromFile:   times.Timings.CreateNodeFromFile,
+			// TimeAddNodeInCRDTDAG: times.Timings.TimeAddNodeInCRDTDAG,
+		})
+
+	}
 	self.GetDag().UpdateRootNodeFolder()
 	return received
 }

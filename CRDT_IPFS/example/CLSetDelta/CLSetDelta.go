@@ -12,13 +12,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/interface-go-ipfs-core/path"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -270,7 +269,7 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) IsKnown(cid CRDTDag.EncodedStr) bool 
 	}
 	return find
 }
-func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) []string {
+func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) ([]string, []([]byte)) {
 
 	to_add := make([]CRDTDag.EncodedStr, 0)
 	for _, cid := range cids {
@@ -293,7 +292,7 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Merge(cids []CRDTDag.EncodedStr) []st
 		state_withDelta := State{DeltaState: (*n.DagNode.Event).(*PayloadDeltaBased).SetDeltaState, SetData: make(map[Element]int, 0)}
 		thisCRDTDag.setValue.SetState.mergeState(state_withDelta)
 	}
-	return fils
+	return fils, make([]([]byte), 0)
 }
 
 func (thisCRDTDag *CRDTCLSetDeltaBasedDag) remoteAddNode(cID CRDTDag.EncodedStr, newnode CRDTCLSetDeltaBasedDagNode) {
@@ -301,10 +300,10 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) remoteAddNode(cID CRDTDag.EncodedStr,
 	thisCRDTDag.dag.RemoteAddNodeSuper(cID, &pl)
 }
 
-func (thisCRDTDag *CRDTCLSetDeltaBasedDag) callAddToIPFS(bytes []byte, file string) (path.Resolved, error) {
+func (thisCRDTDag *CRDTCLSetDeltaBasedDag) callAddToIPFS(bytes []byte, file string) (blocks.Block, error) {
 	time_toencrypt := -1
 	ti := time.Now()
-	var path path.Resolved
+	var path blocks.Block
 	var err error
 	if thisCRDTDag.dag.Key != "" {
 		path, err = thisCRDTDag.GetCRDTManager().AddToIPFS(thisCRDTDag.dag.Sys, bytes, &time_toencrypt)
@@ -363,85 +362,85 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) callAddToIPFS(bytes []byte, file stri
 }
 
 func (thisCRDTDag *CRDTCLSetDeltaBasedDag) SendState() (string, TimeTuple) {
-	if !reflect.DeepEqual(thisCRDTDag.lastSentValue.SetState.SetData, thisCRDTDag.setValue.SetState.SetData) {
-		newNode := CreateDagNode(thisCRDTDag.setValue.SetState.DeltaState, thisCRDTDag.GetSys().IpfsNode.Identity.Pretty())
-		newNode.DagNode.DirectDependency = append(newNode.DagNode.DirectDependency, thisCRDTDag.dag.Root_nodes...)
+	// if !reflect.DeepEqual(thisCRDTDag.lastSentValue.SetState.SetData, thisCRDTDag.setValue.SetState.SetData) {
+	newNode := CreateDagNode(thisCRDTDag.setValue.SetState.DeltaState, thisCRDTDag.GetSys().IpfsNode.Identity.ShortString())
+	newNode.DagNode.DirectDependency = append(newNode.DagNode.DirectDependency, thisCRDTDag.dag.Root_nodes...)
 
-		strFile := thisCRDTDag.dag.NextFileName()
-		if _, err := os.Stat(strFile); !errors.Is(err, os.ErrNotExist) {
-			os.Remove(strFile)
-		}
-		newNode.ToFile(strFile)
-		bytes, err := os.ReadFile(strFile)
-		if err != nil {
-			panic(fmt.Errorf("ERROR INCREMENT CRDTSetOpBasedDag, could not read file\nerror: %s", err))
-		}
-		path, err := thisCRDTDag.callAddToIPFS(bytes, strFile)
-		if err != nil {
-			panic(fmt.Errorf("CRDTSetOpBasedDag Increment, could not add the file to IFPS\nerror: %s", err))
-		}
-
-		encodedCid := thisCRDTDag.dag.EncodeCid(path)
-		c := cid.Cid{}
-		err = json.Unmarshal(encodedCid.Str, &c)
-		if err != nil {
-			panic(fmt.Errorf("CRDTSetOpBasedDag Increment, could not UnMarshal\nerror: %s", err))
-		}
-
-		// fmt.Println("encodedCid Increment :", c.String())
-		var pl CRDTDag.CRDTDagNodeInterface = &newNode
-
-		thisCRDTDag.dag.AddNode(encodedCid, &pl) // Adding the node created before to the Merkle-DAG
-
-		thisCRDTDag.SendRemoteUpdates() // Send the StateBased node.
-
-		// Empty the delta state so it does represent actual delta state ( remove everything that has been sent already)
-		thisCRDTDag.setValue.SetState.emptyDeltaState()
-
-		times := TimeTuple{} // Time measurement structure, for analysis only (when thisCRDTDag.Measurement is true)
-		if thisCRDTDag.measurement {
-			//Add time
-			times.FileSize = len(bytes)
-			b, err := os.ReadFile(strFile + ".timeAdd")
-			if err != nil {
-				panic(fmt.Errorf("couldn't read TimeAdd file\nError: %s\n\t", err))
-			}
-			intAdd, err := strconv.Atoi(string(b))
-			if err != nil {
-				panic(fmt.Errorf(" timeAdd file is malformatted, and couldn't be Atoi'ed\nError: %s\n\t", err))
-			}
-			times.Time_add = intAdd
-
-			err = os.Remove(strFile + ".timeAdd")
-			if err != nil {
-				panic(fmt.Errorf("couldn't Remove TimeAdd file\nError: %s\n\t", err))
-			}
-
-			// Encrypt Time
-			times.Time_encrypt = 0
-			if thisCRDTDag.dag.Key != "" {
-				b, err = os.ReadFile(strFile + ".timeEncrypt")
-				if err != nil {
-					panic(fmt.Errorf("couldn't read timeEncrypt file\nError: %s\n\t", err))
-				}
-				intAdd, err = strconv.Atoi(string(b))
-				if err != nil {
-					panic(fmt.Errorf("timeEncrypt file is malformatted, and couldn't be Atoi'ed\nError: %s\n\t", err))
-				}
-				times.Time_encrypt = intAdd
-
-				err = os.Remove(strFile + ".timeEncrypt")
-				if err != nil {
-					panic(fmt.Errorf("couldn't Remove timeEncrypt file\nError: %s\n\t", err))
-				}
-			}
-		}
-
-		thisCRDTDag.lastSentValue.SetState.mergeState(thisCRDTDag.setValue.SetState)
-		return c.String(), times
-	} else {
-		return "", TimeTuple{}
+	strFile := thisCRDTDag.dag.NextFileName()
+	if _, err := os.Stat(strFile); !errors.Is(err, os.ErrNotExist) {
+		os.Remove(strFile)
 	}
+	newNode.ToFile(strFile)
+	bytes, err := os.ReadFile(strFile)
+	if err != nil {
+		panic(fmt.Errorf("ERROR INCREMENT CRDTSetOpBasedDag, could not read file\nerror: %s", err))
+	}
+	path, err := thisCRDTDag.callAddToIPFS(bytes, strFile)
+	if err != nil {
+		panic(fmt.Errorf("CRDTSetOpBasedDag Increment, could not add the file to IFPS\nerror: %s", err))
+	}
+
+	encodedCid := thisCRDTDag.dag.EncodeCid(path)
+	c := cid.Cid{}
+	err = json.Unmarshal(encodedCid.Str, &c)
+	if err != nil {
+		panic(fmt.Errorf("CRDTSetOpBasedDag Increment, could not UnMarshal\nerror: %s", err))
+	}
+
+	// fmt.Println("encodedCid Increment :", c.String())
+	var pl CRDTDag.CRDTDagNodeInterface = &newNode
+
+	thisCRDTDag.dag.AddNode(encodedCid, &pl) // Adding the node created before to the Merkle-DAG
+
+	thisCRDTDag.SendRemoteUpdates() // Send the StateBased node.
+
+	// Empty the delta state so it does represent actual delta state ( remove everything that has been sent already)
+	thisCRDTDag.setValue.SetState.emptyDeltaState()
+
+	times := TimeTuple{} // Time measurement structure, for analysis only (when thisCRDTDag.Measurement is true)
+	if thisCRDTDag.measurement {
+		//Add time
+		times.FileSize = len(bytes)
+		b, err := os.ReadFile(strFile + ".timeAdd")
+		if err != nil {
+			panic(fmt.Errorf("couldn't read TimeAdd file\nError: %s\n\t", err))
+		}
+		intAdd, err := strconv.Atoi(string(b))
+		if err != nil {
+			panic(fmt.Errorf(" timeAdd file is malformatted, and couldn't be Atoi'ed\nError: %s\n\t", err))
+		}
+		times.Time_add = intAdd
+
+		err = os.Remove(strFile + ".timeAdd")
+		if err != nil {
+			panic(fmt.Errorf("couldn't Remove TimeAdd file\nError: %s\n\t", err))
+		}
+
+		// Encrypt Time
+		times.Time_encrypt = 0
+		if thisCRDTDag.dag.Key != "" {
+			b, err = os.ReadFile(strFile + ".timeEncrypt")
+			if err != nil {
+				panic(fmt.Errorf("couldn't read timeEncrypt file\nError: %s\n\t", err))
+			}
+			intAdd, err = strconv.Atoi(string(b))
+			if err != nil {
+				panic(fmt.Errorf("timeEncrypt file is malformatted, and couldn't be Atoi'ed\nError: %s\n\t", err))
+			}
+			times.Time_encrypt = intAdd
+
+			err = os.Remove(strFile + ".timeEncrypt")
+			if err != nil {
+				panic(fmt.Errorf("couldn't Remove timeEncrypt file\nError: %s\n\t", err))
+			}
+		}
+	}
+
+	// thisCRDTDag.lastSentValue.SetState.mergeState(thisCRDTDag.setValue.SetState)
+	return c.String(), times
+	// } else {
+	// 	return "", TimeTuple{}
+	// }
 }
 func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Add(x string) {
 	thisCRDTDag.setValue.Add(x)
@@ -463,7 +462,7 @@ func Create_CRDTCLSetDeltaBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConf
 			panic(fmt.Errorf("could not read initial_value, error : %s", err))
 		}
 		crdtSet.Add(string(x))
-		// newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, crdtSet.GetSys().IpfsNode.Identity.Pretty())
+		// newNode := CreateDagNode(Operation{Elem: Element(x), Op: ADD}, crdtSet.GetSys().IpfsNode.Identity.ShortString())
 		// strFile := crdtSet.dag.NextFileName()
 
 		// if _, err := os.Stat(strFile); !errors.Is(err, os.ErrNotExist) {
@@ -489,7 +488,7 @@ func Create_CRDTCLSetDeltaBasedDag(sys *IpfsLink.IpfsLink, cfg Config.CRONUSConf
 		// // fmt.Println("encodedCid Increment :", c.String())
 		// var pl1 CRDTDag.CRDTDagNodeInterface = &newNode
 
-		// crdtSet.dag.AddNode(encodedCid, &pl1) // TODOSetCrdt Complete Node interface
+		// crdtSet.dag.AddNode(encodedCid, &pl1)
 
 	}
 	var pl CRDTDag.CRDTDag = &crdtSet
@@ -519,7 +518,9 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) Lookup() CRDTCLSetDeltaBased {
 type TimeTuple struct {
 	Cid            string
 	RetrievalAlone int
+	SeekAlone      int
 	RetrievalTotal int
+	SeekTotal      int
 	CalculTime     int
 	Time_add       int
 	Time_encrypt   int
@@ -656,12 +657,13 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) add_cids(to_add []([]byte), computeti
 		bytes_encoded = append(bytes_encoded, CRDTDag.EncodedStr{Str: bytesread})
 	}
 
-	filesWritten := thisCRDTDag.Merge(bytes_encoded)
+	filesWritten, _ := thisCRDTDag.Merge(bytes_encoded)
 
 	for index, bytesread := range to_add {
 		s := cid.Cid{}
 		json.Unmarshal(bytesread, &s)
 		timeRetrieve := 0
+		timeSeek := 0
 		timeDecrypt := 0
 		fileSize := 0
 		if thisCRDTDag.measurement && filesWritten[index] != "node1/node1" {
@@ -678,6 +680,23 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) add_cids(to_add []([]byte), computeti
 			}
 
 			err = os.Remove(filesWritten[index] + ".timeRetrieve")
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not remove time to retrieve file\nerror: %s", err))
+			}
+
+			// Get Time of seektime
+			str, err = os.ReadFile(filesWritten[index] + ".timeSeek")
+			fileInfo, _ = os.Stat(filesWritten[index])
+			fileSize = int(fileInfo.Size())
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not read time to retrieve measurement\nerror: %s", err))
+			}
+			timeSeek, err = strconv.Atoi(string(str))
+			if err != nil {
+				panic(fmt.Errorf("set.go - could not translate time to retrieve to string, maybe malformerd ?\nerror: %s", err))
+			}
+
+			err = os.Remove(filesWritten[index] + ".timeSeek")
 			if err != nil {
 				panic(fmt.Errorf("set.go - could not remove time to retrieve file\nerror: %s", err))
 			}
@@ -702,7 +721,17 @@ func (thisCRDTDag *CRDTCLSetDeltaBasedDag) add_cids(to_add []([]byte), computeti
 		}
 		// fmt.Println("calling UpdateRootNodeFolder")
 
-		received = append(received, TimeTuple{Cid: s.String(), RetrievalAlone: timeRetrieve, RetrievalTotal: timeRetrieve * len(to_add), CalculTime: int(computetime[index]), ArrivalTime: int(arrivalTime[index]), Time_decrypt: timeDecrypt, Time_encrypt: 0, FileSize: fileSize})
+		received = append(received, TimeTuple{
+			Cid:            s.String(),
+			RetrievalAlone: timeRetrieve,
+			RetrievalTotal: timeRetrieve * len(to_add),
+			SeekAlone:      timeSeek,
+			SeekTotal:      timeSeek * len(to_add),
+			CalculTime:     int(computetime[index]),
+			ArrivalTime:    int(arrivalTime[index]),
+			Time_decrypt:   timeDecrypt,
+			Time_encrypt:   0,
+			FileSize:       fileSize})
 	}
 
 	thisCRDTDag.GetDag().UpdateRootNodeFolder()
